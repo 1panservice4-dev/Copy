@@ -22,15 +22,15 @@ jobs:
         with:
           version: 'latest'
 
-      # [정산 핵심] 에러 로그의 조언대로 -fdeclspec 플래그를 추가하여 
-      # 코드 내의 __declspec(dllexport) 문법을 무사히 통과시킵니다.
+      # [정산 핵심] -D 옵션을 추가하여, 컴파일러가 __declspec 문법을 만났을 때 
+      # 에러를 내지 않고 빈칸(공백)으로 취급해서 통과시키도록 매크로 환경을 전면 제어합니다.
       - name: Compile Pure C++ Source Files
         run: |
           echo "=== 순수 C++ 파일 컴파일 진행 중 ==="
           emcc *.cpp \
             -O3 \
             -std=c++17 \
-            -fdeclspec \
+            -D"__declspec(x)=" \
             -I. \
             -s WASM=1 \
             -s EXPORTED_FUNCTIONS="['_create_duel', '_start_duel', '_process', '_new_card', '_set_player_info']" \
