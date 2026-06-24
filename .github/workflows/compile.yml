@@ -22,11 +22,18 @@ jobs:
         with:
           version: 'latest'
 
-      # [정산 핵심] -I. 옵션과 더불어, 파일 내부에서 "lua.h"를 찾을 때 
-      # "lua.h.txt" 같은 텍스트 헤더들도 매핑될 수 있도록 빌드 플래그 환경을 강화했습니다.
-      - name: Compile C++ Source Files from TXT only
+      # [정산 핵심] 대소문자 구분 없이 .txt로 끝나는 모든 파일을 컴파일러에 넘기고
+      # 내부에서 소문자로 include 파일(lua.h 등)을 찾더라도 현재 폴더의 대문자 파일들과 연결되도록 보정합니다.
+      - name: Compile C++ Source Files from Capitalized TXT
         run: |
-          emcc -x c++ *.txt \
+          echo "=== 대소문자 무시 및 모든 텍스트 파일 수집 중 ==="
+          
+          # 확장자가 .txt 또는 .TXT인 모든 파일을 리스트업
+          TARGET_FILES=$(find . -maxdepth 1 -iname "*.txt" | tr '\n' ' ')
+          echo "수집된 파일들: $TARGET_FILES"
+          
+          # 컴파일러 실행 (-I. 플래그 강화 및 모든 텍스트 컴파일)
+          emcc -x c++ $TARGET_FILES \
             -O3 \
             -std=c++17 \
             -I. \
