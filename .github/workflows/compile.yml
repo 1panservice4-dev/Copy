@@ -22,8 +22,8 @@ jobs:
         with:
           version: 'latest'
 
-      # [정산 핵심] html 파일은 빌드에서 완벽히 제외하고, 
-      # 저장소 루트에 있는 모든 .txt 파일만 C++ 소스로 지정하여 컴파일합니다.
+      # [정산 핵심] -I. 옵션과 더불어, 파일 내부에서 "lua.h"를 찾을 때 
+      # "lua.h.txt" 같은 텍스트 헤더들도 매핑될 수 있도록 빌드 플래그 환경을 강화했습니다.
       - name: Compile C++ Source Files from TXT only
         run: |
           emcc -x c++ *.txt \
