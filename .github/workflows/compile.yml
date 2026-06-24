@@ -22,18 +22,12 @@ jobs:
         with:
           version: 'latest'
 
-      # [정산 핵심] 대소문자 구분 없이 .txt로 끝나는 모든 파일을 컴파일러에 넘기고
-      # 내부에서 소문자로 include 파일(lua.h 등)을 찾더라도 현재 폴더의 대문자 파일들과 연결되도록 보정합니다.
-      - name: Compile C++ Source Files from Capitalized TXT
+      # [정산 완료] 소문자로 복원된 모든 .cpp 파일들을 수집하여 깨끗하게 컴파일합니다.
+      # 헤더 파일들이 있는 현재 폴더(-I.)를 참조합니다.
+      - name: Compile Pure C++ Source Files
         run: |
-          echo "=== 대소문자 무시 및 모든 텍스트 파일 수집 중 ==="
-          
-          # 확장자가 .txt 또는 .TXT인 모든 파일을 리스트업
-          TARGET_FILES=$(find . -maxdepth 1 -iname "*.txt" | tr '\n' ' ')
-          echo "수집된 파일들: $TARGET_FILES"
-          
-          # 컴파일러 실행 (-I. 플래그 강화 및 모든 텍스트 컴파일)
-          emcc -x c++ $TARGET_FILES \
+          echo "=== 순수 C++ 파일 컴파일 진행 중 ==="
+          emcc *.cpp \
             -O3 \
             -std=c++17 \
             -I. \
