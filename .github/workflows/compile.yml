@@ -22,21 +22,11 @@ jobs:
         with:
           version: 'latest'
 
-      # [정산 핵심] HTML 파일 내부에서 태그(<...>)를 실시간으로 제거하고 
-      # 순수 C++ 구문만 추출하여 임시 .cpp 파일로 만들어내는 파이프라인 구축
-      - name: Extract Pure Cpp from HTML and Compile
+      # [정산 핵심] html 파일은 빌드에서 완벽히 제외하고, 
+      # 저장소 루트에 있는 모든 .txt 파일만 C++ 소스로 지정하여 컴파일합니다.
+      - name: Compile C++ Source Files from TXT only
         run: |
-          echo "=== HTML 파일에서 순수 C++ 소스 정산 중 ==="
-          for file in card.html duel.html field.html effect.html group.html processor.html 데이터베이스.html; do
-            if [ -f "$file" ]; then
-              # sed 명령어로 모든 HTML 태그(<[^>]*>)를 완벽하게 제거하고 알맹이만 임시 cpp로 복사
-              sed 's/<[^>]*>//g' "$file" > "${file%.html}.tmp.cpp"
-              echo "✓ $file 변환 완료 -> ${file%.html}.tmp.cpp"
-            fi
-          done
-
-          echo "=== Emscripten 컴파일 시작 ==="
-          emcc *.tmp.cpp \
+          emcc -x c++ *.txt \
             -O3 \
             -std=c++17 \
             -I. \
