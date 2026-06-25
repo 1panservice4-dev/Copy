@@ -22,12 +22,12 @@ jobs:
         with:
           version: 'latest'
 
-      # [정산 완료] 유희왕 룰 엔진(*.cpp)과 내부 핵심 구동축인 루아 라이브러리(*.c)를 
-      # 한 덩어리로 묶어서 완벽한 WebAssembly로 빌드합니다.
+      # [정산 핵심] -x c++ 플래그를 명령어 맨 앞에 두어, 
+      # 뒤따라오는 *.cpp와 *.c 파일 모두를 C++17 규격으로 안전하게 일괄 컴파일하도록 강제합니다.
       - name: Compile Pure C++ and Lua Source Files
         run: |
-          echo "=== C++ 및 루아 파일 동시 통합 빌드 중 ==="
-          emcc *.cpp *.c \
+          echo "=== C++ 및 루아 파일 통합 빌드 (규격 분리 정산) ==="
+          emcc -x c++ *.cpp *.c \
             -O3 \
             -std=c++17 \
             -D"__declspec(x)=" \
