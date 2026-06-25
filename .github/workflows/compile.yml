@@ -1,14 +1,34 @@
-# ... 상단 설정부 동일 ...
+name: Pure Cpp to WebAssembly and Self-Commit
+
+on:
+  push:
+    branches: [ main, master ]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Emscripten compiler
+        uses: mymindstorm/setup-emsdk@v11
+        with:
+          version: 'latest'
 
       - name: Compile Pure C++ and Lua Source Files
         run: |
-          echo "=== 1단계: 루아 C 소스 파일 컴파일 (C 규격으로 독립 빌드) ==="
+          echo "=== 1단계: 루아 C 소스 파일 컴파일 (C 규격 독립 빌드) ==="
           emcc -O3 -c *.c -I.
 
           echo "=== 2단계: OCGCore C++ 소스 파일 컴파일 ==="
           em++ -O3 -std=c++17 -c *.cpp -D"__declspec(x)=" -I.
 
-          echo "=== 3단계: 생성된 오브젝트 파일들 최종 결합 및 웹어셈블리 링크 ==="
+          echo "=== 3단계: 웹어셈블리 최종 링크 (이름 맹글링 해결) ==="
           em++ *.o \
             -O3 \
             -s WASM=1 \
@@ -16,4 +36,13 @@
             -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" \
             -o ocgcore.js
 
-# ... 하단 커밋부 동일 ...
+      - name: Commit and Push Compiled Files Direct
+        run: |
+          git config --local user.email "1panservice4-dev@users.noreply.github.com"
+          git config --local user.name "GitHub Action Robot"
+          git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git add ocgcore.js ocgcore.wasm
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: 엔진 빌드 성공 및 웹 배포용 파일 자동 갱신"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
