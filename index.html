@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web YGOPRO 클라이언트 (HTML5/Canvas)</title>
+    <title>Web YGOPRO 클라이언트</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -17,8 +17,6 @@
             min-height: 100vh;
             overflow: hidden;
         }
-
-        /* 메인 게임 컨테이너 (CSS3 배치) */
         #game-container {
             display: flex;
             gap: 15px;
@@ -27,26 +25,20 @@
             border-radius: 10px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-
-        /* HTML5 Canvas (유니티 3D 뷰포트 대체) */
         #game-canvas {
-            background: #333333;
+            background: #1f2421;
             border: 2px solid #444;
             border-radius: 6px;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
         }
-
-        /* 우측 카드 디스크립션 패널 */
         #side-panel {
-            width: 300px;
+            width: 280px;
             display: flex;
             flex-direction: column;
             gap: 10px;
         }
-
         #card-preview {
             width: 100%;
-            height: 400px;
+            height: 380px;
             background: #111;
             border: 2px solid #555;
             border-radius: 6px;
@@ -55,13 +47,11 @@
             justify-content: center;
             overflow: hidden;
         }
-
         #card-preview img {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
         }
-
         #log-console {
             flex-grow: 1;
             background: #111;
@@ -69,185 +59,332 @@
             border-radius: 6px;
             padding: 10px;
             font-family: monospace;
-            font-size: 12px;
+            font-size: 11px;
             color: #0f0;
             overflow-y: auto;
-            height: 180px;
+            height: 190px;
         }
+        .btn-panel {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        button {
+            background: #444;
+            color: #fff;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background: #555; }
     </style>
 </head>
 <body>
 
+    <div class="btn-panel">
+        <button onclick="addDemoCard(0, CardLocation.Hand, 24094653)">내 패에 추가 (블랙 매지션)</button>
+        <button onclick="addDemoCard(0, CardLocation.Hand, 89631139)">내 패에 추가 (백룡)</button>
+        <button onclick="addDemoCard(0, CardLocation.MonsterZone, 46986414)">내 몬스터존 0번 소환</button>
+        <button onclick="addDemoCard(1, CardLocation.MonsterZone, 74677422)">상대 몬스터존 0번 소환</button>
+    </div>
+
     <div id="game-container">
         <canvas id="game-canvas" width="1024" height="600"></canvas>
-
         <div id="side-panel">
             <div id="card-preview">
-                <span id="preview-placeholder" style="color: #666;">카드 호버/선택 시 표시</span>
+                <span id="preview-placeholder" style="color: #666;">카드에 마우스를 올리세요</span>
                 <img id="preview-image" src="" style="display: none;" alt="Card Preview">
             </div>
             <div id="log-console">> 시스템 초기화 중...</div>
         </div>
     </div>
 
-    <script src="ocgcore.js" onerror="log('지정된 ocgcore.js 엔진을 찾을 수 없습니다. WASM 빌드가 선행되어야 합니다.', 'red')"></script>
-
+    <script src="ocgcore.js" onerror="log('ocgcore.js를 로드할 수 없습니다. 로컬 테스트 모드로 진입합니다.', '#ffaa00')"></script>
+    
     <script>
-        // --- 1. 유니티 C# 환경 변수 및 상태(Condition) 이식 ---
-        const Condition = { N: 0, duel: 1, watch: 2, record: 3 };
-        
-        const state = {
-            condition: Condition.duel,
-            masterRule: 0,
-            inAI: false,
-            codeForShow: 0,
-            cards: [],        // List<gameCard> 대체
-            linkMaskList: []  // List<linkMask> 대체
-        };
-
-        // UI 뷰포트 레이아웃 상수 (C#의 gameInfo 구조체 및 윈도우 크기 함수 대체)
-        const gameInfo = { width: 1024, height: 600 };
-        const cardDescription = { width: 300 };
-
-        // 유니티의 getScreenCenter() 공식 구현 (웹 브라우저 화면 기준 동적 변환)
-        function getScreenCenter() {
-            return (window.innerWidth + cardDescription.width - gameInfo.width) / 2;
-        }
-
-        // --- 2. HTML5 Canvas 2D 렌더링 루프 (유니티 Update 및 렌더러 대체) ---
-        const canvas = document.getElementById('game-canvas');
-        const ctx = canvas.getContext('2d');
-        const previewImg = document.getElementById('preview-image');
-        const placeholder = document.getElementById('preview-placeholder');
-
-        // 로그 출력 유틸리티
+        // --- [시스템 로그 유틸] ---
         function log(message, color = '#0f0') {
             const consoleDiv = document.getElementById('log-console');
-            consoleDiv.innerHTML += `<br><span style="color: ${color};">> ${message}</span>`;
-            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            if (consoleDiv) {
+                consoleDiv.innerHTML += `<br><span style="color: ${color};">> ${message}</span>`;
+                consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            }
         }
 
-        // 가상 카드 클래스 생성 (유니티 gameCard 오브젝트 래핑)
-        class GameCard {
-            constructor(id, code, x, y) {
+        // =========================================================
+        // [1단계 이식 복합체] Enums & GPS & 필드 레이아웃 연산 규칙
+        // =========================================================
+        const CardLocation = { Deck: 0x01, Hand: 0x02, MonsterZone: 0x04, SpellZone: 0x08, Grave: 0x10, Removed: 0x20, Extra: 0x40, Overlay: 0x80 };
+        const CardPosition = { FaceUp: 0x1, FaceDown: 0x2, Attack: 0x4, Defense: 0x8 };
+        
+        class GPS {
+            constructor(controller, location, sequence, position = CardPosition.FaceUp) {
+                this.controller = controller;
+                this.location = location;
+                this.sequence = sequence;
+                this.position = position;
+            }
+        }
+
+        const FieldConfig = { fieldSize: 1.0, masterRule: 5, canvasWidth: 1024, canvasHeight: 600 };
+
+        function getPointCanvasPosition(gps) {
+            const centerX = FieldConfig.canvasWidth / 2;
+            const centerY = FieldConfig.canvasHeight / 2;
+            const real = (FieldConfig.fieldSize - 1) * 0.9 + 1.0;
+            const pScale = 24 * real;
+            let returnX = 0, zOffset = 0;
+
+            if ((gps.location & CardLocation.MonsterZone) > 0) {
+                let realIndex = gps.sequence;
+                if (gps.controller === 0) {
+                    zOffset = -4.5 * real;
+                } else {
+                    if (realIndex <= 4) realIndex = 4 - gps.sequence;
+                    else if (realIndex === 5) realIndex = 6;
+                    else if (realIndex === 6) realIndex = 5;
+                    zOffset = 4.5 * real;
+                }
+                switch (realIndex) {
+                    case 0: returnX = -10.5; break;
+                    case 1: returnX = -5.2; break;
+                    case 2: returnX = 0; break;
+                    case 3: returnX = 5.2; break;
+                    case 4: returnX = 10.5; break;
+                    case 5: returnX = -5.2; zOffset = 0; break; 
+                    case 6: returnX = 5.2; zOffset = 0; break; 
+                }
+                return { x: centerX + (returnX * pScale), y: centerY + (zOffset * -1 * pScale * 1.1) };
+            }
+            
+            if ((gps.location & CardLocation.SpellZone) > 0) {
+                let realIndex = gps.sequence;
+                if (gps.controller === 0) zOffset = -8.5 * real;
+                else {
+                    if (realIndex <= 4) realIndex = 4 - gps.sequence;
+                    zOffset = 8.5 * real;
+                }
+                switch (realIndex) {
+                    case 0: returnX = -10.5; break;
+                    case 1: returnX = -5.2; break;
+                    case 2: returnX = 0; break;
+                    case 3: returnX = 5.2; break;
+                    case 4: returnX = 10.5; break;
+                }
+                return { x: centerX + (returnX * pScale), y: centerY + (zOffset * -1 * pScale * 1.1) };
+            }
+
+            return { x: centerX, y: centerY };
+        }
+
+        // =========================================================
+        // [2단계 이식 복합체] WebGameCard 모델 및 정렬 매니저
+        // =========================================================
+        class WebGameCard {
+            constructor(id, code, gps) {
                 this.id = id;
-                this.code = code; // 카드 고유 번호 (예: 24094653)
-                this.x = x;
-                this.y = y;
-                this.width = 70;
-                this.height = 102;
+                this.code = code;
+                this.gps = gps;
+                this.x = FieldConfig.canvasWidth / 2;
+                this.y = FieldConfig.canvasHeight / 2;
+                this.targetX = this.x;
+                this.targetY = this.y;
+                this.width = 66;
+                this.height = 96;
+                this.moveSpeed = 0.12;
                 this.isHovered = false;
             }
 
-            draw(context) {
-                // 카드 기본 틀 그리기
-                context.fillStyle = '#2d1e18'; // 효과 몬스터 프레임 색상 대략 지정
-                context.fillRect(this.x, this.y, this.width, this.height);
-                context.strokeStyle = this.isHovered ? '#ff0' : '#fff';
-                context.lineWidth = this.isHovered ? 3 : 1;
-                context.strokeRect(this.x, this.y, this.width, this.height);
+            update() {
+                this.x += (this.targetX - this.x) * this.moveSpeed;
+                this.y += (this.targetY - this.y) * this.moveSpeed;
+            }
 
-                // 카드 텍스트 정보 (ID) 표시
+            draw(context) {
+                context.save();
+                let renderY = this.y;
+                if (this.isHovered && this.gps.location === CardLocation.Hand) {
+                    renderY -= 20; 
+                }
+
+                // 카드 바디 프레임
+                context.fillStyle = this.gps.controller === 0 ? '#2c1d11' : '#1d2c2e';
+                context.fillRect(this.x, renderY, this.width, this.height);
+                
+                // 테두리 강조 연출
+                context.strokeStyle = this.isHovered ? '#ffea00' : '#444';
+                context.lineWidth = this.isHovered ? 3 : 1;
+                context.strokeRect(this.x, renderY, this.width, this.height);
+
+                // 정보 텍스트 기입
                 context.fillStyle = '#fff';
-                context.font = '10px monospace';
-                context.fillText(this.code, this.x + 5, this.y + 20);
+                context.font = 'bold 9px monospace';
+                context.fillText(this.gps.controller === 0 ? "ME" : "OP", this.x + 5, renderY + 15);
+                context.fillText(this.code, this.x + 5, renderY + 30);
+                context.restore();
             }
         }
 
-        // 임의의 필드 초기화 (테스트용 카드 배치)
-        function initGameField() {
-            // 패(Hand)와 몬스터 존에 가상 카드 세팅
-            state.cards.push(new GameCard(1, 24094653, 200, 450)); // 블랙 매지션
-            state.cards.push(new GameCard(2, 89631139, 300, 450)); // 푸른 눈의 백룡
-            state.cards.push(new GameCard(3, 46986414, 400, 250)); // 필드 카드 예시
-            log("게임 필드 데이터(2D 레이아웃) 설정 완료.");
-        }
+        function arrangeCards(allCards) {
+            const myHand = allCards.filter(c => c.gps.controller === 0 && c.gps.location === CardLocation.Hand);
+            const opHand = allCards.filter(c => c.gps.controller === 1 && c.gps.location === CardLocation.Hand);
+            const centerX = FieldConfig.canvasWidth / 2;
+            const maxHandWidth = 500;
+            const cardW = 66;
 
-        // 유니티 렌더링 프레임 루프 대체 (requestAnimationFrame)
-        function gameLoop() {
-            // 화면 클리어
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (myHand.length > 0) {
+                let interval = cardW + 5;
+                if (myHand.length * interval > maxHandWidth) interval = maxHandWidth / myHand.length;
+                const startX = centerX - ((myHand.length - 1) * interval) / 2 - cardW / 2;
+                myHand.forEach((card, i) => {
+                    card.gps.sequence = i;
+                    card.targetX = startX + (i * interval);
+                    card.targetY = FieldConfig.canvasHeight - 110;
+                });
+            }
 
-            // 배경 격자(유희왕 필드 라인 가상 표현)
-            ctx.strokeStyle = '#444';
-            ctx.lineWidth = 1;
-            // 몬스터 / 마함 존 구분 라인
-            ctx.strokeRect(150, 150, 720, 160); // 메인 몬스터 존 영역
-            ctx.strokeRect(150, 320, 720, 160); // 마법 함정 존 영역
+            if (opHand.length > 0) {
+                let interval = cardW + 5;
+                if (opHand.length * interval > maxHandWidth) interval = maxHandWidth / opHand.length;
+                const startX = centerX + ((opHand.length - 1) * interval) / 2 - cardW / 2;
+                opHand.forEach((card, i) => {
+                    card.gps.sequence = i;
+                    card.targetX = startX - (i * interval);
+                    card.targetY = 15;
+                });
+            }
 
-            // 등록된 모든 카드 그리기
-            state.cards.forEach(card => card.draw(ctx));
-
-            requestAnimationFrame(gameLoop);
-        }
-
-        // --- 3. 유니티의 animation_show_card_code_handler() 이벤트 자바스크립트 이식 ---
-        function triggerCardShower(code) {
-            state.codeForShow = code;
-            log(`animation_show_card_code_handler 트리거됨 (Card Code: ${code})`);
-            
-            // 유니티 GameTextureManager.get 대신 웹 이미지 패스 연동
-            // 실제 서비스 시 해당 경로에 카드 일러스트 이미지(데이터베이스) 연동 필요
-            const imageUrl = `https://images.ygoprodeck.com/images/cards/${code}.jpg`;
-            
-            placeholder.style.display = 'none';
-            previewImg.src = imageUrl;
-            previewImg.style.display = 'block';
-        }
-
-        // 마우스 인터랙션 처리 (유니티 Raycast 및 마우스 이벤트 감지 대체)
-        canvas.addEventListener('mousemove', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            let hoveredAny = false;
-            state.cards.forEach(card => {
-                if (mouseX >= card.x && mouseX <= card.x + card.width &&
-                    mouseY >= card.y && mouseY <= card.y + card.height) {
-                    card.isHovered = true;
-                    hoveredAny = true;
-                    if (state.codeForShow !== card.code) {
-                        triggerCardShower(card.code); // 마우스 호버 시 카드 보여주기 핸들러 작동
-                    }
-                } else {
-                    card.isHovered = false;
+            allCards.forEach(card => {
+                if (card.gps.location !== CardLocation.Hand) {
+                    const pos = getPointCanvasPosition(card.gps);
+                    card.targetX = pos.x - card.width / 2;
+                    card.targetY = pos.y - card.height / 2;
                 }
             });
-        });
+        }
 
-        // --- 4. WebAssembly 웹어셈블리 두뇌(ocgcore.js)와의 가교 바인딩 ---
-        var Module = {
-            onRuntimeInitialized: function() {
-                log("WASM 핵심 룰 두뇌 엔진(ocgcore.js) 결합 성공!");
-                
-                try {
-                    // C++ export 함수들 바인딩
-                    const create_duel = Module.cwrap('create_duel', 'number', ['number']);
-                    
-                    log("가상 듀얼 인스턴스 생성 프로세스를 초기화합니다.");
-                    let seed = Math.floor(Math.random() * 99999);
-                    let duelPointer = create_duel(seed);
-                    
-                    log(`[성공] WebAssembly 메모리 주소 ${duelPointer}에 룰 엔진 바인딩 완료.`, '#00ffff');
-                } catch (err) {
-                    log(`엔진 링크 오류 (서버 환경 필요): ${err.message}`, 'red');
+        // =========================================================
+        // [3단계 이식 복합체] 충돌 감지 및 ㅂ.txt 프리뷰 처리장치
+        // =========================================================
+        let globalCodeForShow = 0;
+
+        function webAnimationShowCardCodeHandler(code) {
+            if (!code || globalCodeForShow === code) return;
+            globalCodeForShow = code;
+            
+            const previewImg = document.getElementById('preview-image');
+            const placeholder = document.getElementById('preview-placeholder');
+            
+            if (previewImg && placeholder) {
+                previewImg.src = `https://images.ygoprodeck.com/images/cards/${code}.jpg`;
+                placeholder.style.display = 'none';
+                previewImg.style.display = 'block';
+                log(`카드 탐색 프리뷰 동적 결합: ${code}`);
+            }
+        }
+
+        function setupMouseInteraction(canvasElement, allCards) {
+            canvasElement.addEventListener('mousemove', (e) => {
+                const rect = canvasElement.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                let found = null;
+
+                for (let i = allCards.length - 1; i >= 0; i--) {
+                    const c = allCards[i];
+                    let rY = c.y;
+                    if (c.isHovered && c.gps.location === CardLocation.Hand) rY -= 20;
+                    if (mx >= c.x && mx <= c.x + c.width && my >= rY && my <= rY + c.height) {
+                        found = c;
+                        break;
+                    }
                 }
 
-                // 렌더링 및 필드 시작
-                initGameField();
-                gameLoop();
+                allCards.forEach(c => {
+                    if (c === found) {
+                        if (!c.isHovered) {
+                            c.isHovered = true;
+                            webAnimationShowCardCodeHandler(c.code);
+                        }
+                    } else c.isHovered = false;
+                });
+            });
+        }
+
+        // =========================================================
+        // [4단계 이식 복합체] 메인 구동 루프 및 가상 데이터 매핑 환경
+        // =========================================================
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const cardList = [];
+        let cardIdCounter = 1;
+
+        // 버튼 클릭 유틸: 데모 카드 투입기
+        function addDemoCard(controller, location, code) {
+            const sequenceCounter = cardList.filter(c => c.gps.controller === controller && c.gps.location === location).length;
+            const newCard = new WebGameCard(cardIdCounter++, code, new GPS(controller, location, sequenceCounter));
+            cardList.push(newCard);
+            arrangeCards(cardList);
+            log(`${controller === 0 ? '내' : '상대'} 구역에 카드 일련번호 [${code}] 배치 감지.`);
+        }
+
+        // 필드 고정 라인 레이아웃 가이드선 드로잉 함수
+        function drawFieldSlots() {
+            ctx.strokeStyle = '#3a4454';
+            ctx.lineWidth = 1.5;
+            
+            // 내 구역/상대 구역 가이드라인 (5칸 슬롯 비례 렌더링)
+            for(let i=0; i<5; i++) {
+                let myGpsM = new GPS(0, CardLocation.MonsterZone, i);
+                let myPosM = getPointCanvasPosition(myGpsM);
+                ctx.strokeRect(myPosM.x - 33, myPosM.y - 48, 66, 96);
+
+                let myGpsS = new GPS(0, CardLocation.SpellZone, i);
+                let myPosS = getPointCanvasPosition(myGpsS);
+                ctx.strokeRect(myPosS.x - 33, myPosS.y - 48, 66, 96);
+
+                let opGpsM = new GPS(1, CardLocation.MonsterZone, i);
+                let opPosM = getPointCanvasPosition(opGpsM);
+                ctx.strokeRect(opPosM.x - 33, opPosM.y - 48, 66, 96);
             }
+        }
+
+        // 메인 렌더 프레임 루프 (유니티 Update() 대체)
+        function runMainGameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 1. 배경 매트 가이드라인 드로우
+            drawFieldSlots();
+
+            // 2. 카드 동적 좌표 보간 연산 및 드로우
+            cardList.forEach(card => {
+                card.update();
+                card.draw(ctx);
+            });
+
+            requestAnimationFrame(runMainGameLoop);
+        }
+
+        // --- 초기 시스템 기동 장치 ---
+        window.onload = () => {
+            setupMouseInteraction(canvas, cardList);
+            
+            // 최초 데모용 스타팅 카드 분배 세팅
+            addDemoCard(0, CardLocation.Hand, 24094653); // 블랙매지션
+            addDemoCard(0, CardLocation.Hand, 89631139); // 푸른눈의 백룡
+            addDemoCard(1, CardLocation.Hand, 46986414); // 상대 카드
+
+            runMainGameLoop();
+            log("유니티 ㅂ.txt 이식 1~4단계 완전체 통합 웹 클라이언트 구동 성공.");
         };
 
-        // 로컬 테스트(WASM 부재 상태) 대응용 백업 자동 구동 루프
-        setTimeout(() => {
-            if (state.cards.length === 0) {
-                log("자립형 웹 클라이언트 GUI 데모 모드로 구동합니다.", '#ffaa00');
-                initGameField();
-                gameLoop();
+        // Emscripten 룰 브릿지 연동 인터페이스 정의
+        var Module = {
+            onRuntimeInitialized: function() {
+                log("WASM 오피셜 룰 엔진 core와 결합 완료.", '#00ffff');
             }
-        }, 1000);
+        };
     </script>
 </body>
 </html>
