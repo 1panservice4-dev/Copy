@@ -22,10 +22,15 @@ jobs:
 
       - name: Compile Pure C++ and Lua Source Files
         run: |
-          echo "=== 1단계: 모든 소스를 하나의 C++ 환경 기호로 단일 컴파일 ==="
-          # 루아 헤더 내부에서 변칙적인 extern "C" 규칙이 발동하지 않도록 명시적으로 해제하고,
-          # OCGCore 컴파일러 환경단에서 전체 기호를 하나의 규칙(C++ 네임 맹글링)으로 통일합니다.
-          em++ -O3 -std=c++17 -c *.cpp l*.c -D"__declspec(x)=" -D"LUA_C_LINKAGE=0" -I.
+          echo "=== 1단계: 모든 소스를 하나의 C++ 환경 기호로 강제 통일 ==="
+          # 루아 헤더가 임의로 집어넣는 extern "C" 감싸기(LUA_API, LUALIB_API) 규격을 완전히 공백 처리하여
+          # 전체 오브젝트 파일들이 무조건 동일한 C++ 네임스페이스 규칙을 따르도록 강제합니다.
+          em++ -O3 -std=c++17 -c *.cpp l*.c \
+            -D"__declspec(x)=" \
+            -D"LUA_API= " \
+            -D"LUALIB_API= " \
+            -D"LUAI_FUNC=extern" \
+            -I.
 
           echo "=== 2단계: 웹어셈블리 최종 링크 ==="
           em++ *.o \
