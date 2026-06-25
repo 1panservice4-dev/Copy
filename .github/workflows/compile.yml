@@ -26,7 +26,8 @@ jobs:
           emcc -O3 -c l*.c -I.
 
           echo "=== 2단계: OCGCore C++ 소스 파일 컴파일 ==="
-          em++ -O3 -std=c++17 -c *.cpp -D"__declspec(x)=" -include "lua.h" -I.
+          # C++ 파일 컴파일 시, 전역 매크로 주입을 통해 모든 루아 API가 extern "C" 규칙을 따르도록 강제합니다.
+          em++ -O3 -std=c++17 -c *.cpp -D"__declspec(x)=" -D"LUA_API=extern \"C\"" -D"LUALIB_API=extern \"C\"" -I.
 
           echo "=== 3단계: 웹어셈블리 최종 링크 ==="
           em++ *.o \
