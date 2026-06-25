@@ -1,13 +1,22 @@
-/*
-** $Id: lparser.h $
-** Lua Parser
-** See Copyright Notice in lua.h
-*/
-
 #ifndef lparser_h
 #define lparser_h
 
-struct Dyndata;
+/* Dyndata가 incomplete type으로 터지는 것을 막기 위해 실제 루아 코어의 정의를 직접 주입합니다 */
+typedef struct Labellist {
+  struct Labeldesc *arr;
+  int n;
+  int size;
+} Labellist;
+
+typedef struct Dyndata {
+  struct {
+    struct Vardesc *arr;
+    int n;
+    int size;
+  } actvar;
+  Labellist gt;
+  Labellist label;
+} Dyndata;
 
 #include "llimits.h"
 #include "lobject.h"
