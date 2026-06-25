@@ -13,7 +13,7 @@
         #card-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
         #log-console { flex-grow: 1; background: #0b0b0d; border: 1px solid #2a2a35; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 11px; color: #38ef7d; overflow-y: auto; height: 190px; }
         
-        /* 카드 우클릭/클릭 시 나타날 플레이 커맨드 메뉴 (소환, 발동 등) */
+        /* 카드 우클릭/클릭 시 나타날 플레이 커맨드 메뉴 */
         #context-menu { position: absolute; display: none; background: #2a2d34; border: 1px solid #4fadf7; border-radius: 4px; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
         #context-menu div { padding: 8px 16px; cursor: pointer; font-size: 13px; font-weight: bold; }
         #context-menu div:hover { background: #4fadf7; color: #121214; }
@@ -50,7 +50,7 @@
             }
         }
 
-        // 1~3단계 기본 물리 환경 구조체 상속
+        // 기본 물리 환경 구조체 상속
         const CardLocation = { Deck: 0x01, Hand: 0x02, MonsterZone: 0x04, SpellZone: 0x08 };
         class GPS { constructor(controller, location, sequence) { this.controller = controller; this.location = location; this.sequence = sequence; } }
         const FieldConfig = { canvasWidth: 1024, canvasHeight: 600 };
@@ -78,39 +78,42 @@
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
         const cardList = [];
-        let selectedCard = null; // 현재 메뉴를 열어 선택한 카드 오브젝트 스토리지
-        let pDuelInstance = 0;   // WASM 내부의 듀얼 메모리 포인터 주소 변수
+        let selectedCard = null; 
+        let pDuelInstance = 0;   
+        let isEngineReady = false; // 가상 시뮬레이션 진입 방지용 플래그
 
         // ===================================================================
-        // 🚀 핵심: WebAssembly(ocgcore.js) 엔진 활성화 및 게임 시작 (기동부)
+        // 🚀 수정된 핵심 기동부: 전역 Module을 덮어쓰지 않고 확장 등록합니다.
         // ===================================================================
-        var Module = {
-            onRuntimeInitialized: function() {
-                log("WASM 핵심 오피셜 룰 엔진(ocgcore.js)결합 성공!", "#00ffff");
+        window.Module = window.Module || {};
+        
+        Module['onRuntimeInitialized'] = function() {
+            isEngineReady = true; // 실제 엔진 로딩 완료됨을 알림
+            log("WASM 핵심 오피셜 룰 엔진(ocgcore.js) 결합 성공!", "#00ffff");
+            
+            try {
+                // 더 안전하게 Module에서 직접 cwrap 함수를 추출해 맵핑합니다.
+                const create_duel = Module.cwrap('create_duel', 'number', ['number']);
                 
-                try {
-                    // C++ 엔진에서 내보낸 함수들을 자바스크립트 함수로 맵핑(래핑)
-                    const create_duel = Module.cwrap('create_duel', 'number', ['number']);
-                    const start_duel = Module.cwrap('start_duel', 'void', ['number', 'number']);
-                    
-                    log("WASM 내부 메모리에 유희왕 가상 룰 판(Instance)을 생성합니다.");
-                    let seed = Math.floor(Math.random() * 12345);
-                    pDuelInstance = create_duel(seed); // 룰 엔진 기동 및 주소값 리턴
-                    log(`[성공] 듀얼 인스턴스가 주소지 ${pDuelInstance}에 배치되었습니다.`);
+                log("WASM 내부 메모리에 유희왕 가상 룰 판(Instance)을 생성합니다.");
+                let seed = Math.floor(Math.random() * 12345);
+                pDuelInstance = create_duel(seed); 
+                log(`[성공] 듀얼 인스턴스가 주소지 ${pDuelInstance}에 성공적으로 배치되었습니다.`);
 
-                    // 게임 플레이 환경 구축을 위한 카드 데이터 세팅
-                    initGamePlayData();
-                    runMainGameLoop();
-                    
-                } catch (err) {
-                    log(`엔진 기동 실패 (컴파일 환경 에러): ${err.message}`, 'red');
-                }
+                initGamePlayData();
+                runMainGameLoop();
+                
+            } catch (err) {
+                log(`엔진 기동 실패 (컴파일 환경 에러): ${err.message}`, 'red');
             }
         };
 
         // 초기 시작 덱/패 세팅 함수
         function initGamePlayData() {
-            // 내 패에 블랙 매지션과 푸른 눈의 백룡 추가
+            // 카드 중복 로딩 방지
+            if (cardList.length > 0) return;
+            
+            // 내 패에 블랙 매지션(24094653)과 푸른 눈의 백룡(89631139) 추가
             cardList.push(new WebGameCard(1, 24094653, new GPS(0, CardLocation.Hand, 0)));
             cardList.push(new WebGameCard(2, 89631139, new GPS(0, CardLocation.Hand, 1)));
             arrangeCards();
@@ -118,7 +121,7 @@
         }
 
         // ===================================================================
-        // 🕹️ 유저 플레이 액션(소환/발동) 처리 및 엔진 데이터 전송
+        // 🕹️ 유저 플레이 액션(소환/발동) 처리
         // ===================================================================
         function handlePlayAction(actionType) {
             const menu = document.getElementById('context-menu');
@@ -128,21 +131,16 @@
             if (actionType === 'summon') {
                 log(`[플레이어 액션] ${selectedCard.code} 카드를 몬스터 존에 일반 소환 시도합니다.`, '#ffea00');
                 
-                // 1. 실제 플레이에서는 이 타이밍에 WASM 엔진에게 유저가 소환했다는 바이트 패킷을 전송합니다.
-                // 예시 바인딩 수식: Module.ccall('process_handler', 'number', ['number', 'number'], [pDuelInstance, selectedCard.code]);
-                
-                // 2. 엔진의 허가 처리가 떨어지면 룰 상태에 맞게 카드의 위치(GPS)를 패에서 몬스터 존으로 변경합니다.
+                // 패에서 몬스터 존으로 위치 상태 변경
                 selectedCard.gps.location = CardLocation.MonsterZone;
                 selectedCard.gps.sequence = 2; // 메인 몬스터 존 중앙 슬롯 배정
                 
-                // 3. 필드 위치가 변했으므로 카드를 물리적 좌표로 다시 정렬시킵니다.
                 arrangeCards();
             }
         }
 
-        // 인터랙션 (클릭 및 컨텍스트 메뉴 팝업 제어)
+        // 인터랙션 (클릭 및 컨텍스트 메뉴 제어)
         function setupInteraction() {
-            // 마우스 움직임 호버 감지
             canvas.addEventListener('mousemove', (e) => {
                 const rect = canvas.getBoundingClientRect();
                 const mx = e.clientX - rect.left; const my = e.clientY - rect.top;
@@ -157,25 +155,23 @@
                 });
             });
 
-            // 우클릭(Context Menu) 시 소환/발동 선택창 UI 구현
+            // 우클릭 시 컨텍스트 메뉴 노출 제어 (오타 수정됨: menu.style.style -> menu.style.display)
             canvas.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 const hoveredCard = cardList.find(c => c.isHovered && c.gps.controller === 0);
                 if (hoveredCard) {
                     selectedCard = hoveredCard;
                     const menu = document.getElementById('context-menu');
-                    menu.style.style = 'block';
                     menu.style.left = `${e.clientX}px`;
                     menu.style.top = `${e.clientY}px`;
                     menu.style.display = 'block';
                 }
             });
 
-            // 바탕 클릭 시 메뉴 닫기
             window.addEventListener('click', () => { document.getElementById('context-menu').style.display = 'none'; });
         }
 
-        // 카드 물리 좌표 정렬 및 드로잉 프레임 엔진
+        // 카드 좌표 정렬
         function arrangeCards() {
             cardList.forEach(card => {
                 if (card.gps.location === CardLocation.Hand) {
@@ -197,13 +193,13 @@
             requestAnimationFrame(runMainGameLoop);
         }
 
-        // 로컬 브라우저 보안 우회용 자동 구동 예외 세팅
+        // 엔진 로딩 실패 시 작동할 가상 시뮬레이터 백업 예외 장치
         setTimeout(() => {
-            if (pDuelInstance === 0) {
-                log("서버 환경이 구비되지 않아 가상 시뮬레이션 플레이 모드로 진입합니다.", "#ff9f43");
+            if (!isEngineReady && pDuelInstance === 0) {
+                log("서버 로딩 시간이 초과되어 가상 시뮬레이션 플레이 모드로 진입합니다.", "#ff9f43");
                 initGamePlayData(); runMainGameLoop();
             }
-        }, 1200);
+        }, 1500);
     </script>
 </body>
 </html>
