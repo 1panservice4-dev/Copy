@@ -3,501 +3,251 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yu-Gi-Oh! OCG Web Simulator (Integrated API)</title>
+    <title>Web YGOPRO 클라이언트 (HTML5/Canvas)</title>
     <style>
-        *, *::before, *::after { box-sizing: border-box; }
-        html, body {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            background-color: #0b111e; overflow: hidden;
-            display: flex; align-items: center; justify-content: center;
-            font-family: 'Malgun Gothic', 'Segoe UI', sans-serif; color: #f0f4f8;
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
         }
-        #ui-root-canvas {
-            width: 1280px; height: 720px;
-            background: radial-gradient(circle at center, #16243d 0%, #080d16 100%);
-            border: 2px solid #00d2ff; border-radius: 12px;
-            box-shadow: 0 0 35px rgba(0, 210, 255, 0.25);
-            position: relative; overflow: hidden;
+
+        /* 메인 게임 컨테이너 (CSS3 배치) */
+        #game-container {
+            display: flex;
+            gap: 15px;
+            background: #262626;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-        .ui-anchor { position: absolute; z-index: 10; }
-        .top-left { top: 20px; left: 20px; }
-        .bottom-right { bottom: 20px; right: 20px; }
-        .top-right { top: 20px; right: 20px; }
-        .bottom-left { bottom: 20px; left: 20px; }
-        .panel {
-            background: rgba(10, 18, 32, 0.85); border: 1px solid #223b68;
-            border-radius: 8px; padding: 14px; box-sizing: border-box;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+
+        /* HTML5 Canvas (유니티 3D 뷰포트 대체) */
+        #game-canvas {
+            background: #333333;
+            border: 2px solid #444;
+            border-radius: 6px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
         }
-        .lp-box { min-width: 150px; text-align: center; border-left: 4px solid #ff3b70; }
-        .lp-box.mine { border-left: 4px solid #00d2ff; }
-        .lp-val { font-size: 26px; font-weight: bold; font-family: monospace; color: #fff; text-shadow: 0 0 8px rgba(255,255,255,0.3); }
-        .btn {
-            width: 100%; padding: 8px; margin-bottom: 6px; background: #00d2ff;
-            border: none; border-radius: 5px; color: #070d14; font-weight: bold; cursor: pointer;
-            text-align: center; display: block; box-sizing: border-box; transition: background 0.2s;
+
+        /* 우측 카드 디스크립션 패널 */
+        #side-panel {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
-        .btn:hover { background: #00b0d4; }
-        .log-stream { height: 110px; width: 240px; background: #04080f; font-size: 11px; font-family: monospace; color: #39ff14; overflow-y: auto; white-space: pre-wrap; padding: 6px; border: 1px solid #1c3257; border-radius: 4px; }
-        .description-panel {
-            top: 90px; left: 20px; width: 280px; height: 460px;
-            display: flex; flex-direction: column; gap: 10px;
+
+        #card-preview {
+            width: 100%;
+            height: 400px;
+            background: #111;
+            border: 2px solid #555;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
         }
-        .card-pic-area {
-            width: 100%; height: 160px; background: #0f192b; 
-            border: 1px solid #1c3257; border-radius: 4px; display: flex; align-items: center; justify-content: center;
-            font-size: 13px; color: #7f9bbd; text-align: center; font-weight: bold;
+
+        #card-preview img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
         }
-        .font-controls { display: flex; gap: 5px; margin-bottom: 2px; }
-        .btn-sm { padding: 4px 8px; font-size: 11px; background: #1c3257; color: #fff; border: 1px solid #00d2ff; border-radius: 4px; cursor: pointer; }
-        .btn-sm:hover { background: #00d2ff; color: #070d14; }
-        .desc-text-list {
-            flex: 1; background: #04080f; border: 1px solid #1c3257; border-radius: 4px; padding: 10px;
-            font-size: 13px; line-height: 1.5; overflow-y: auto; color: #a1bad8; white-space: pre-wrap;
+
+        #log-console {
+            flex-grow: 1;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #0f0;
+            overflow-y: auto;
+            height: 180px;
         }
-        #duel-field-container {
-            position: absolute; top: 155px; width: 560px; transition: left 0.3s ease;
-            display: flex; flex-direction: column; align-items: center; gap: 18px;
-        }
-        .matrix-row { display: flex; gap: 14px; }
-        .matrix-slot {
-            width: 95px; height: 135px; background: rgba(15, 25, 43, 0.45);
-            border: 2px solid #284473; border-radius: 6px;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            font-size: 11px; color: #6a88b5; text-align: center; transition: all 0.2s; cursor: pointer;
-        }
-        .matrix-slot:hover { border-color: #00d2ff; background: rgba(15, 25, 43, 0.8); }
-        .matrix-slot.mzone { border-color: #ff5500; }
-        .matrix-slot.szone { border-color: #009688; }
-        .matrix-slot.active-card { background: #15294a; border-color: #39ff14; color: #39ff14; font-weight: bold; box-shadow: 0 0 12px rgba(57,255,20,0.35); }
-        #pro1-card-shower-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(4, 6, 10, 0.75); z-index: 100;
-            display: none; align-items: center; justify-content: center;
-            opacity: 0; transition: opacity 0.25s ease;
-        }
-        .shower-box {
-            width: 270px; height: 390px; background: #111d33;
-            border: 4px solid #ffb700; border-radius: 12px;
-            box-shadow: 0 0 45px #ffb700;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            position: relative; animation: cardPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        @keyframes cardPop {
-            0% { transform: scale(0.6); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        .shower-img-placeholder { font-size: 22px; font-weight: bold; color: #ffb700; text-align: center; margin-bottom: 20px; padding: 0 15px; text-shadow: 0 0 10px rgba(255,183,0,0.4); }
-        .shower-status-tag { position: absolute; bottom: 20px; background: rgba(0,0,0,0.85); padding: 5px 14px; border-radius: 5px; font-size: 12px; font-weight: bold; border: 1px solid #39ff14; color: #39ff14; }
     </style>
 </head>
 <body>
 
-    <div id="ui-root-canvas">
-        <!-- OPPONENT LP -->
-        <div class="ui-anchor top-left panel lp-box">
-            <div style="font-size:11px; color:#7f9bbd; font-weight: bold;">OPPONENT (PLAYER 1)</div>
-            <div class="lp-val" id="p1-lp">8000</div>
-        </div>
+    <div id="game-container">
+        <canvas id="game-canvas" width="1024" height="600"></canvas>
 
-        <!-- ServantWithCardDescription UI -->
-        <div class="ui-anchor description-panel panel" id="card-description-view">
-            <div style="font-size: 11px; font-weight: bold; color: #00d2ff;" id="panel-title">CARD DETAILS</div>
-            <div style="height:100%; display:flex; flex-direction:column; justify-content: space-between;">
-                <div class="card-pic-area" id="pic-sprite">NO SELECTION</div>
-                <div style="margin: 4px 0;">
-                    <div class="font-controls">
-                        <button class="btn-sm" onclick="CardDescription.onb()">크게 (+)</button>
-                        <button class="btn-sm" onclick="CardDescription.ons()">작게 (-)</button>
-                        <button class="btn-sm" style="margin-left:auto;" onclick="CardDescription.onPre()">이전</button>
-                        <button class="btn-sm" onclick="CardDescription.onNext()">다음</button>
-                    </div>
-                </div>
-                <div class="desc-text-list" id="description-box">필드의 카드를 클릭하거나 엔진을 구동해 대전을 제어하세요.</div>
+        <div id="side-panel">
+            <div id="card-preview">
+                <span id="preview-placeholder" style="color: #666;">카드 호버/선택 시 표시</span>
+                <img id="preview-image" src="" style="display: none;" alt="Card Preview">
             </div>
-        </div>
-
-        <!-- Duel Field Matrix Grid Container -->
-        <div id="duel-field-container">
-            <!-- Monster Zone (MZONE) -->
-            <div class="matrix-row">
-                <div class="matrix-slot mzone" id="mzone-slot-0" onclick="CardDescription.selectSlot('mzone', 0)">MZONE 0</div>
-                <div class="matrix-slot mzone" id="mzone-slot-1" onclick="CardDescription.selectSlot('mzone', 1)">MZONE 1</div>
-                <div class="matrix-slot mzone" id="mzone-slot-2" onclick="CardDescription.selectSlot('mzone', 2)">MZONE 2</div>
-                <div class="matrix-slot mzone" id="mzone-slot-3" onclick="CardDescription.selectSlot('mzone', 3)">MZONE 3</div>
-                <div class="matrix-slot mzone" id="mzone-slot-4" onclick="CardDescription.selectSlot('mzone', 4)">MZONE 4</div>
-            </div>
-            <!-- Spell / Trap Zone (SZONE) -->
-            <div class="matrix-row">
-                <div class="matrix-slot szone" id="szone-slot-0" onclick="CardDescription.selectSlot('szone', 0)">SZONE 0</div>
-                <div class="matrix-slot szone" id="szone-slot-1" onclick="CardDescription.selectSlot('szone', 1)">SZONE 1</div>
-                <div class="matrix-slot szone" id="szone-slot-2" onclick="CardDescription.selectSlot('szone', 2)">SZONE 2</div>
-                <div class="matrix-slot szone" id="szone-slot-3" onclick="CardDescription.selectSlot('szone', 3)">SZONE 3</div>
-                <div class="matrix-slot szone" id="szone-slot-4" onclick="CardDescription.selectSlot('szone', 4)">SZONE 4</div>
-            </div>
-        </div>
-
-        <!-- PLAYER 0 LP (YOU) -->
-        <div class="ui-anchor bottom-right panel lp-box mine">
-            <div style="font-size:11px; color:#00d2ff; font-weight: bold;">PLAYER 0 (YOU)</div>
-            <div class="lp-val" id="p0-lp">8000</div>
-        </div>
-
-        <!-- YDK Quick Injection System -->
-        <div class="ui-anchor bottom-left panel" style="width: 240px;">
-            <div style="font-size: 11px; font-weight: bold; margin-bottom: 5px; color:#00d2ff;">🎴 YDK DECK INJECTOR</div>
-            <button class="btn" onclick="OcgWasmEngine.injectYdkMock()">테스트 덱 데이터 로드</button>
-            <div id="deck-runtime-status" style="font-size:11px; color:#7f9bbd; margin-top:4px;">대기 상태...</div>
-        </div>
-
-        <!-- Ocgapi Integration Engine Controller Panel -->
-        <div class="ui-anchor top-right panel">
-            <div style="font-size:12px; font-weight:bold; color:#00d2ff; margin-bottom:6px;">OCG CORE ENGINE (JS/WASM)</div>
-            <button class="btn" onclick="OcgWasmEngine.startDuelBtn()">start_duel (듀얼 시작)</button>
-            <button class="btn" onclick="OcgWasmEngine.setPlayerInfoBtn()">set_player_info (스펙 설정)</button>
-            <button class="btn" onclick="OcgWasmEngine.setResponseiBtn()">set_responsei (정수 입력)</button>
-            <button class="btn" onclick="OcgWasmEngine.queryFieldInfoBtn()">query_field_info (필드 압축조회)</button>
-            <button class="btn" onclick="OcgWasmEngine.endDuelBtn()" style="background:#ff3b70; color:#fff;">end_duel (가상메모리 해제)</button>
-            <div class="log-stream" id="net-log">연산 파이프라인 대기 중...</div>
-        </div>
-
-        <!-- pro1CardShower Animation Layer -->
-        <div id="pro1-card-shower-overlay" onclick="OcgcoreUI.closeCardShower()">
-            <div class="shower-box">
-                <div class="shower-img-placeholder" id="shower-card-name">CARD NAME</div>
-                <div style="font-size:13px; color:#a1bad8; text-align:center; padding: 0 15px; line-height: 1.4;" id="shower-card-desc">카드가 소환되었습니다.</div>
-                <div class="shower-status-tag" id="shower-card-status">SUMMON</div>
-            </div>
+            <div id="log-console">> 시스템 초기화 중...</div>
         </div>
     </div>
 
+    <script src="ocgcore.js" onerror="log('지정된 ocgcore.js 엔진을 찾을 수 없습니다. WASM 빌드가 선행되어야 합니다.', 'red')"></script>
+
     <script>
-        /* =================================================================
-           1. C++ Ocgapi 원본 로직 완벽 자바스크립트 가상화 엔진 구현부
-           ================================================================= */
+        // --- 1. 유니티 C# 환경 변수 및 상태(Condition) 이식 ---
+        const Condition = { N: 0, duel: 1, watch: 2, record: 3 };
         
-        // 데이터 조회를 위한 QUERY FLAGS 정수 매핑 (제공 소스코드 반영)
-        const QUERY_CODE       = 0x1;
-        const QUERY_POSITION   = 0x2;
-        const QUERY_ALIAS      = 0x4;
-        const QUERY_TYPE       = 0x8;
-        const QUERY_LEVEL      = 0x10;
-        const QUERY_RANK       = 0x20;
-        const QUERY_ATTRIBUTE  = 0x40;
-        const QUERY_RACE       = 0x80;
-        const QUERY_ATTACK     = 0x100;
-        const QUERY_DEFENSE    = 0x200;
-
-        // 가상 카드 테이블 데이터베이스
-        const MOCK_CDB_DATABASE = {
-            89631139: { code: 89631139, name: "푸른 눈의 백룡", desc: "높은 공격력을 자랑하는 전설의 드래곤. 어떠한 상대라도 분쇄해 버리는 파괴력은 상상을 초월한다.", atk: 3000, def: 2500, type: 0x11 },
-            46986414: { code: 46986414, name: "블랙 매지션", desc: "마법사 중, 공격력 / 방어력이 최고의 계급을 자랑하는 전설의 마법사.", atk: 2500, def: 2100, type: 0x11 }
+        const state = {
+            condition: Condition.duel,
+            masterRule: 0,
+            inAI: false,
+            codeForShow: 0,
+            cards: [],        // List<gameCard> 대체
+            linkMaskList: []  // List<linkMask> 대체
         };
 
-        // 가상 듀얼 인스턴스 전역 포인터 (pduel 객체 메모리 대체 공간)
-        let activeDuelInstance = null;
+        // UI 뷰포트 레이아웃 상수 (C#의 gameInfo 구조체 및 윈도우 크기 함수 대체)
+        const gameInfo = { width: 1024, height: 600 };
+        const cardDescription = { width: 300 };
 
-        // C++ 기능 완벽 변환 파이프라인 구현 함수군
-        const Ocgapi = {
-            start_duel: function(pduel, options) {
-                const ptduel = pduel;
-                // C++: ptduel->game_field->add_process(0, 0, ...);
-                ptduel.game_field.add_process(0, 0, null, null, 0, 0, 0, 0, null, null);
-                this.log("[API start_duel] 최상위 턴 시작 마스터 프로세스 예약 유닛(0번) 가동.");
-            },
-
-            set_player_info: function(pduel, playerid, lp, startcount, drawcount) {
-                const ptduel = pduel;
-                ptduel.game_field.player[playerid].lp = lp;
-                ptduel.game_field.player[playerid].start_count = startcount;
-                ptduel.game_field.player[playerid].draw_count = drawcount;
-                this.log(`[API set_player_info] 플레이어 ${playerid} 세팅 동기화 -> LP: ${lp}, 초기 패: ${startcount}장`);
-            },
-
-            end_duel: function(pduel) {
-                if (!pduel) return;
-                pduel.clear_buffer();
-                if (pduel.game_field) {
-                    pduel.game_field.core.units = [];
-                    pduel.game_field.core.subunits = [];
-                }
-                this.log("[API end_duel] 듀얼 인스턴스 버퍼 정리 및 세션 안전 종료.");
-            },
-
-            set_responsei: function(pduel, value) {
-                const ptduel = pduel;
-                if (!ptduel.game_field.core.response_buf) {
-                    ptduel.game_field.core.response_buf = new Uint8Array(64);
-                }
-                const view = new DataView(ptduel.game_field.core.response_buf.buffer);
-                view.setInt32(0, value, true); // Little-Endian 방식으로 하위 가상 바이너리 주입
-                ptduel.game_field.core.response_len = 4;
-                this.log(`[API set_responsei] 플레이어 선택 정수 데이터 [${value}]를 response_buf에 바이너리 4바이트 정산 입력 완료.`);
-            },
-
-            set_responseb: function(pduel, respArray) {
-                const ptduel = pduel;
-                if (!ptduel.game_field.core.response_buf) {
-                    ptduel.game_field.core.response_buf = new Uint8Array(64);
-                }
-                const len = respArray.length > 64 ? 64 : respArray.length;
-                for (let i = 0; i < len; i++) {
-                    ptduel.game_field.core.response_buf[i] = respArray[i];
-                }
-                ptduel.game_field.core.response_len = len;
-                this.log(`[API set_responseb] 다중 패킷 바이트 배열 (길이: ${len}) 버퍼 주입 완료.`);
-            },
-
-            query_card: function(pduel, playerid, location, sequence, query_flag, destBuf, use_cache) {
-                const ptduel = pduel;
-                const pcard = ptduel.game_field.get_card(playerid, location, sequence);
-                if (!pcard) {
-                    const view = new DataView(destBuf.buffer);
-                    view.setInt32(0, 0, true);
-                    return 4;
-                }
-                let offset = 0;
-                const view = new DataView(destBuf.buffer);
-                if (query_flag & QUERY_CODE) {
-                    view.setUint32(offset, pcard.data.code, true);
-                    offset += 4;
-                }
-                if (query_flag & QUERY_POSITION) {
-                    destBuf[offset] = pcard.current.position;
-                    offset += 1;
-                }
-                if (query_flag & QUERY_TYPE) {
-                    view.setUint32(offset, pcard.data.type, true);
-                    offset += 4;
-                }
-                if (query_flag & QUERY_ATTACK) {
-                    view.setInt32(offset, pcard.get_attack(), true);
-                    offset += 4;
-                }
-                if (query_flag & QUERY_DEFENSE) {
-                    view.setInt32(offset, pcard.get_defense(), true);
-                    offset += 4;
-                }
-                return offset;
-            },
-
-            query_field_info: function(pduel, destBuf) {
-                const ptduel = pduel;
-                let offset = 0;
-                for (let playerid = 0; playerid < 2; playerid++) {
-                    const player = ptduel.game_field.player[playerid];
-                    // 메인 몬스터 존 루프 압축 정산
-                    for (let i = 0; i < player.list_mzone.length; i++) {
-                        const pcard = player.list_mzone[i];
-                        if (pcard) {
-                            destBuf[offset++] = 1; // 존재 유무 플래그
-                            destBuf[offset++] = pcard.current.position;
-                            destBuf[offset++] = pcard.xyz_materials ? pcard.xyz_materials.length : 0;
-                        } else {
-                            destBuf[offset++] = 0;
-                        }
-                    }
-                    // 마함 존 루프 체크
-                    for (let i = 0; i < player.list_szone.length; i++) {
-                        const pcard = player.list_szone[i];
-                        if (pcard) {
-                            destBuf[offset++] = 1;
-                            destBuf[offset++] = pcard.current.position;
-                        } else {
-                            destBuf[offset++] = 0;
-                        }
-                    }
-                }
-                destBuf[offset++] = ptduel.game_field.core.current_chain.length;
-                this.log(`[API query_field_info] 판 판독 완료. 직렬화 압축 패킷 바이너리 반환 완료. (총 ${offset}바이트)`);
-                return offset;
-            },
-
-            log: function(msg) {
-                const consoleLog = document.getElementById('net-log');
-                consoleLog.innerText = msg + "
-" + consoleLog.innerText;
-            }
-        };
-
-        /* =================================================================
-           2. Ocgcore.cs / Unity Screen Resolution & UI Layout Logic 포팅부
-           ================================================================= */
-        const canvas = document.getElementById('ui-root-canvas');
-        function adjustCanvasScale() {
-            const scale = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
-            canvas.style.transform = `scale(${scale})`;
+        // 유니티의 getScreenCenter() 공식 구현 (웹 브라우저 화면 기준 동적 변환)
+        function getScreenCenter() {
+            return (window.innerWidth + cardDescription.width - gameInfo.width) / 2;
         }
-        window.addEventListener('resize', adjustCanvasScale);
-        window.addEventListener('DOMContentLoaded', adjustCanvasScale);
 
-        const OcgcoreUI = {
-            cardDescriptionWidth: 280, 
-            gameInfoWidth: 560,        
+        // --- 2. HTML5 Canvas 2D 렌더링 루프 (유니티 Update 및 렌더러 대체) ---
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const previewImg = document.getElementById('preview-image');
+        const placeholder = document.getElementById('preview-placeholder');
 
-            // Ocgcore.cs 내의 getScreenCenter 수식 구현 완벽 이식
-            getScreenCenter: function() {
-                return (1280 + this.cardDescriptionWidth - this.gameInfoWidth) / 2;
-            },
-            alignFieldContainer: function() {
-                const centerXPx = this.getScreenCenter();
-                document.getElementById('duel-field-container').style.left = centerXPx + "px";
-            },
-            // animation_show_card_code_handler 기반 pro1CardShower 연출 웹 복각
-            triggerCardShower: function(cardData) {
-                const overlay = document.getElementById('pro1-card-shower-overlay');
-                document.getElementById('shower-card-name').innerText = cardData.name;
-                document.getElementById('shower-card-desc').innerText = cardData.desc;
-                
-                const statusTag = document.getElementById('shower-card-status');
-                statusTag.innerText = "SUMMON / ENGINE ACTIVE";
-                
-                overlay.style.display = "flex";
-                setTimeout(() => { overlay.style.opacity = "1"; }, 15);
-            },
-            closeCardShower: function() {
-                const overlay = document.getElementById('pro1-card-shower-overlay');
-                overlay.style.opacity = "0";
-                setTimeout(() => { overlay.style.display = "none"; }, 250);
+        // 로그 출력 유틸리티
+        function log(message, color = '#0f0') {
+            const consoleDiv = document.getElementById('log-console');
+            consoleDiv.innerHTML += `<br><span style="color: ${color};">> ${message}</span>`;
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        // 가상 카드 클래스 생성 (유니티 gameCard 오브젝트 래핑)
+        class GameCard {
+            constructor(id, code, x, y) {
+                this.id = id;
+                this.code = code; // 카드 고유 번호 (예: 24094653)
+                this.x = x;
+                this.y = y;
+                this.width = 70;
+                this.height = 102;
+                this.isHovered = false;
             }
-        };
-        OcgcoreUI.alignFieldContainer();
 
-        /* =================================================================
-           3. Runtime Logic Controller Pipeline
-           ================================================================= */
-        const OcgWasmEngine = {
-            startDuelBtn: function() {
-                // 가상 메모리 인스턴스 안전 할당 배정
-                activeDuelInstance = {
-                    clear_buffer: () => {},
-                    game_field: {
-                        player: [
-                            { lp: 8000, start_count: 0, draw_count: 0, list_mzone: [null, null, null, null, null], list_szone: [null, null, null, null, null] },
-                            { lp: 8000, start_count: 0, draw_count: 0, list_mzone: [null, null, null, null, null], list_szone: [null, null, null, null, null] }
-                        ],
-                        core: {
-                            units: [], subunits: [], response_buf: null, response_len: 0, current_chain: []
-                        },
-                        add_process: function() {},
-                        get_card: function(pid, loc, seq) {
-                            if(loc === 0x04) return this.player[pid].list_mzone[seq];
-                            return null;
-                        }
+            draw(context) {
+                // 카드 기본 틀 그리기
+                context.fillStyle = '#2d1e18'; // 효과 몬스터 프레임 색상 대략 지정
+                context.fillRect(this.x, this.y, this.width, this.height);
+                context.strokeStyle = this.isHovered ? '#ff0' : '#fff';
+                context.lineWidth = this.isHovered ? 3 : 1;
+                context.strokeRect(this.x, this.y, this.width, this.height);
+
+                // 카드 텍스트 정보 (ID) 표시
+                context.fillStyle = '#fff';
+                context.font = '10px monospace';
+                context.fillText(this.code, this.x + 5, this.y + 20);
+            }
+        }
+
+        // 임의의 필드 초기화 (테스트용 카드 배치)
+        function initGameField() {
+            // 패(Hand)와 몬스터 존에 가상 카드 세팅
+            state.cards.push(new GameCard(1, 24094653, 200, 450)); // 블랙 매지션
+            state.cards.push(new GameCard(2, 89631139, 300, 450)); // 푸른 눈의 백룡
+            state.cards.push(new GameCard(3, 46986414, 400, 250)); // 필드 카드 예시
+            log("게임 필드 데이터(2D 레이아웃) 설정 완료.");
+        }
+
+        // 유니티 렌더링 프레임 루프 대체 (requestAnimationFrame)
+        function gameLoop() {
+            // 화면 클리어
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 배경 격자(유희왕 필드 라인 가상 표현)
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 1;
+            // 몬스터 / 마함 존 구분 라인
+            ctx.strokeRect(150, 150, 720, 160); // 메인 몬스터 존 영역
+            ctx.strokeRect(150, 320, 720, 160); // 마법 함정 존 영역
+
+            // 등록된 모든 카드 그리기
+            state.cards.forEach(card => card.draw(ctx));
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- 3. 유니티의 animation_show_card_code_handler() 이벤트 자바스크립트 이식 ---
+        function triggerCardShower(code) {
+            state.codeForShow = code;
+            log(`animation_show_card_code_handler 트리거됨 (Card Code: ${code})`);
+            
+            // 유니티 GameTextureManager.get 대신 웹 이미지 패스 연동
+            // 실제 서비스 시 해당 경로에 카드 일러스트 이미지(데이터베이스) 연동 필요
+            const imageUrl = `https://images.ygoprodeck.com/images/cards/${code}.jpg`;
+            
+            placeholder.style.display = 'none';
+            previewImg.src = imageUrl;
+            previewImg.style.display = 'block';
+        }
+
+        // 마우스 인터랙션 처리 (유니티 Raycast 및 마우스 이벤트 감지 대체)
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            let hoveredAny = false;
+            state.cards.forEach(card => {
+                if (mouseX >= card.x && mouseX <= card.x + card.width &&
+                    mouseY >= card.y && mouseY <= card.y + card.height) {
+                    card.isHovered = true;
+                    hoveredAny = true;
+                    if (state.codeForShow !== card.code) {
+                        triggerCardShower(card.code); // 마우스 호버 시 카드 보여주기 핸들러 작동
                     }
-                };
-
-                // 초기 기본 몬스터 필드 배치 데이터 수동 주입 (C++ 주입 연산 동기화)
-                activeDuelInstance.game_field.player[0].list_mzone[2] = {
-                    data: { code: 89631139, type: 0x11 },
-                    current: { position: 0x1 },
-                    get_attack: () => 3000,
-                    get_defense: () => 2500
-                };
-
-                Ocgapi.start_duel(activeDuelInstance, 0);
-                this.syncView();
-            },
-
-            setPlayerInfoBtn: function() {
-                if (!activeDuelInstance) return alert("start_duel을 먼저 가동하십시오.");
-                Ocgapi.set_player_info(activeDuelInstance, 0, 8000, 5, 1);
-                Ocgapi.set_player_info(activeDuelInstance, 1, 4000, 5, 1);
-                this.syncView();
-            },
-
-            setResponseiBtn: function() {
-                if (!activeDuelInstance) return alert("엔진이 비활성화 상태입니다.");
-                Ocgapi.set_responsei(activeDuelInstance, 1); // 임의 선택 플래그 1 전송
-            },
-
-            queryFieldInfoBtn: function() {
-                if (!activeDuelInstance) return alert("엔진이 비활성화 상태입니다.");
-                const buffer = new Uint8Array(256);
-                Ocgapi.query_field_info(activeDuelInstance, buffer);
-            },
-
-            endDuelBtn: function() {
-                if (!activeDuelInstance) return;
-                Ocgapi.end_duel(activeDuelInstance);
-                activeDuelInstance = null;
-                this.syncView();
-            },
-
-            injectYdkMock: function() {
-                if (!activeDuelInstance) return alert("start_duel을 호출해 엔진을 먼저 켜주세요.");
-                activeDuelInstance.game_field.player[0].list_mzone[0] = {
-                    data: { code: 46986414, type: 0x11 },
-                    current: { position: 0x1 },
-                    get_attack: () => 2500,
-                    get_defense: () => 2100
-                };
-                document.getElementById('deck-runtime-status').innerHTML = "<span style='color:#39ff14;'>Injection 성공 (블랙 매지션)</span>";
-                OcgcoreUI.triggerCardShower(MOCK_CDB_DATABASE[46986414]);
-                this.syncView();
-            },
-
-            syncView: function() {
-                if (!activeDuelInstance) {
-                    document.getElementById('p0-lp').innerText = "8000";
-                    document.getElementById('p1-lp').innerText = "8000";
-                    for(let i=0; i<5; i++){
-                        document.getElementById(`mzone-slot-${i}`).classList.remove('active-card');
-                        document.getElementById(`mzone-slot-${i}`).innerText = `MZONE ${i}`;
-                    }
-                    return;
+                } else {
+                    card.isHovered = false;
                 }
-                const gf = activeDuelInstance.game_field;
-                document.getElementById('p0-lp').innerText = gf.player[0].lp;
-                document.getElementById('p1-lp').innerText = gf.player[1].lp;
+            });
+        });
 
-                for (let i = 0; i < 5; i++) {
-                    const mSlot = document.getElementById(`mzone-slot-${i}`);
-                    const card = gf.player[0].list_mzone[i];
-                    if (card) {
-                        const db = MOCK_CDB_DATABASE[card.data.code];
-                        mSlot.classList.add('active-card');
-                        mSlot.innerHTML = `<strong>${db.name}</strong><br>⚔️ ${card.get_attack()}`;
-                        mSlot.dataset.cardId = card.data.code;
-                    } else {
-                        mSlot.classList.remove('active-card');
-                        mSlot.innerText = `MZONE ${i}`;
-                        delete mSlot.dataset.cardId;
-                    }
+        // --- 4. WebAssembly 웹어셈블리 두뇌(ocgcore.js)와의 가교 바인딩 ---
+        var Module = {
+            onRuntimeInitialized: function() {
+                log("WASM 핵심 룰 두뇌 엔진(ocgcore.js) 결합 성공!");
+                
+                try {
+                    // C++ export 함수들 바인딩
+                    const create_duel = Module.cwrap('create_duel', 'number', ['number']);
+                    
+                    log("가상 듀얼 인스턴스 생성 프로세스를 초기화합니다.");
+                    let seed = Math.floor(Math.random() * 99999);
+                    let duelPointer = create_duel(seed);
+                    
+                    log(`[성공] WebAssembly 메모리 주소 ${duelPointer}에 룰 엔진 바인딩 완료.`, '#00ffff');
+                } catch (err) {
+                    log(`엔진 링크 오류 (서버 환경 필요): ${err.message}`, 'red');
                 }
+
+                // 렌더링 및 필드 시작
+                initGameField();
+                gameLoop();
             }
         };
 
-        /* =================================================================
-           4. ServantWithCardDescription UI Interaction Logic
-           ================================================================= */
-        window.CardDescription = {
-            fontSize: 13, datas: [], current: 0,
-            selectSlot: function(zone, idx) {
-                const slot = document.getElementById(`${zone}-slot-${idx}`);
-                if (slot && slot.dataset.cardId) {
-                    const code = parseInt(slot.dataset.cardId, 10);
-                    if (MOCK_CDB_DATABASE[code]) {
-                        this.datas.push(MOCK_CDB_DATABASE[code]);
-                        this.current = this.datas.length - 1;
-                        this.apply(MOCK_CDB_DATABASE[code]);
-                    }
-                }
-            },
-            apply: function(card) {
-                const box = document.getElementById('description-box');
-                box.innerHTML = `[ID: ${card.code}] <strong>${card.name}</strong>
-⚔️ ATK: ${card.atk} / 🛡️ DEF: ${card.def}
--------------------------
-${card.desc}`;
-                document.getElementById('pic-sprite').innerText = card.name;
-                document.getElementById('panel-title').innerText = `DETAILS: ${card.name}`;
-            },
-            onb: function() { this.fontSize++; document.getElementById('description-box').style.fontSize = this.fontSize + 'px'; },
-            ons: function() { if(this.fontSize > 9) this.fontSize--; document.getElementById('description-box').style.fontSize = this.fontSize + 'px'; },
-            onPre: function() { if(this.current > 0) this.current--; this.apply(this.datas[this.current]); },
-            onNext: function() { if(this.current < this.datas.length - 1) this.current++; this.apply(this.datas[this.current]); }
-        };
+        // 로컬 테스트(WASM 부재 상태) 대응용 백업 자동 구동 루프
+        setTimeout(() => {
+            if (state.cards.length === 0) {
+                log("자립형 웹 클라이언트 GUI 데모 모드로 구동합니다.", '#ffaa00');
+                initGameField();
+                gameLoop();
+            }
+        }, 1000);
     </script>
 </body>
 </html>
