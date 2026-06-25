@@ -22,12 +22,12 @@ jobs:
         with:
           version: 'latest'
 
-      # [정산 핵심] 표준 라이브러리를 건드리는 -Dbyte를 즉시 제거하고,
-      # 윈도우용 __declspec만 표준 매크로 방식으로 완벽히 무력화합니다.
-      - name: Compile Pure C++ Source Files
+      # [정산 완료] 유희왕 룰 엔진(*.cpp)과 내부 핵심 구동축인 루아 라이브러리(*.c)를 
+      # 한 덩어리로 묶어서 완벽한 WebAssembly로 빌드합니다.
+      - name: Compile Pure C++ and Lua Source Files
         run: |
-          echo "=== 순수 C++ 파일 컴파일 진행 중 ==="
-          emcc *.cpp \
+          echo "=== C++ 및 루아 파일 동시 통합 빌드 중 ==="
+          emcc *.cpp *.c \
             -O3 \
             -std=c++17 \
             -D"__declspec(x)=" \
@@ -47,7 +47,7 @@ jobs:
           git add ocgcore.js ocgcore.wasm
           
           if ! git diff --cached --quiet; then
-            git commit -m "chore: [자동 정산] 웹 구동용 핵심 엔진 최신 빌드 완료 (ocgcore.js / wasm)"
+            git commit -m "chore: [자동 정산] 웹 구동용 핵심 엔진 최종 빌드 성공 (ocgcore.js / wasm)"
             git push origin HEAD:${{ github.ref_name }}
           else
             echo "변동 내역이 없어 패스합니다."
