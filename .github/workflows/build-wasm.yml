@@ -18,16 +18,17 @@ jobs:
       with:
         version: 3.1.64
 
-    - name: 3. C# 유니티 스크립트(ocgcore.c)를 제외하고 컴파일
+    - name: 3. C# 파일 제외 및 표준 함수만 지정하여 빌드
       run: |
-        # 1. 임시 폴더를 만들어 유니티 C# 파일인 ocgcore.c를 컴파일 대상에서 안전하게 제외합니다.
+        # 1. 유니티 C# 파일인 ocgcore.c를 컴파일 대상에서 안전하게 제외합니다.
         mkdir -p temp_hide
         if [ -f ocgcore.c ]; then mv ocgcore.c temp_hide/; fi
         
-        # 2. 방해꾼이 사라진 상태에서 순수 C++/C 파일들만 모아 윈도우 호환 옵션(-fdeclspec)과 함께 컴파일합니다.
+        # 2. 호환성이 검증된 표준 OCGCore 익스포트 함수들만 지정하여 컴파일합니다.
+        # 경고를 뿜던 EXTRA_EXPORTED_RUNTIME_METHODS도 최신 문법인 EXPORTED_RUNTIME_METHODS로 교정했습니다.
         emcc -O3 -s WASM=1 -fdeclspec \
-          -s EXPORTED_FUNCTIONS="['_create_duel', '_start_duel', '_end_duel', '_set_card_reader', '_set_script_reader', '_set_message_handler', '_process_command', '_get_log_message']" \
-          -s EXTRA_EXPORTED_RUNTIME_METHODS="['cwrap', 'ccall']" \
+          -s EXPORTED_FUNCTIONS="['_create_duel', '_start_duel', '_end_duel', '_set_card_reader', '_set_script_reader', '_set_message_handler']" \
+          -s EXPORTED_RUNTIME_METHODS="['cwrap', 'ccall']" \
           -s ALLOW_MEMORY_GROWTH=1 \
           -o ocgcore.js \
           *.cpp *.c
