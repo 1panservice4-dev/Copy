@@ -26,13 +26,12 @@ jobs:
           emcc -O3 -c l*.c -I.
 
           echo "=== 2단계: OCGCore C++ 소스 파일 컴파일 ==="
-          em++ -O3 -std=c++17 -c *.cpp -D"__declspec(x)=" -I.
+          em++ -O3 -std=c++17 -c *.cpp -D"__declspec(x)=" -include "lua.h" -I.
 
-          echo "=== 3단계: 링크 단계에서 강제 기호 매핑 ==="
+          echo "=== 3단계: 웹어셈블리 최종 링크 ==="
           em++ *.o \
             -O3 \
             -s WASM=1 \
-            -Wl,--defsym,_Z14luaL_openlibsP9lua_State=luaL_openlibs \
             -s EXPORTED_FUNCTIONS="['_create_duel','_start_duel','_process','_new_card','_set_player_info']" \
             -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" \
             -o ocgcore.js
@@ -44,6 +43,6 @@ jobs:
           git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
           git add ocgcore.js ocgcore.wasm
           if ! git diff --cached --quiet; then
-            git commit -m "chore: 엔진 빌드 성공 및 웹 배포용 파일 자동 갱신"
+            git commit -m "chore: 웹어셈블리 엔진 빌드 완벽 성공 및 배포 파일 자동 갱신"
             git push origin HEAD:${{ github.ref_name }}
           fi
