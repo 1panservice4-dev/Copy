@@ -22,10 +22,10 @@ jobs:
 
       - name: Compile Pure C++ and Lua Source Files
         run: |
-          echo "=== 1단계: 모든 C++ 및 루아 C 소스 통합 빌드 ==="
-          # 루아 헤더가 C++ 모드에서 스스로 extern "C" 규칙을 채택하도록 LUA_USE_CTYPE 매크로 등을 정리하고,
-          # C# 파일(ocgcore.c)을 제외한 모든 .cpp 파일과 l*.c 파일을 C++ 환경에서 한 번에 빌드합니다.
-          em++ -O3 -std=c++17 -c *.cpp l*.c -D"__declspec(x)=" -D"LUA_API=extern \"C\"" -D"LUALIB_API=extern \"C\"" -I.
+          echo "=== 1단계: 모든 소스를 하나의 C++ 환경 기호로 단일 컴파일 ==="
+          # 루아 헤더 내부에서 변칙적인 extern "C" 규칙이 발동하지 않도록 명시적으로 해제하고,
+          # OCGCore 컴파일러 환경단에서 전체 기호를 하나의 규칙(C++ 네임 맹글링)으로 통일합니다.
+          em++ -O3 -std=c++17 -c *.cpp l*.c -D"__declspec(x)=" -D"LUA_C_LINKAGE=0" -I.
 
           echo "=== 2단계: 웹어셈블리 최종 링크 ==="
           em++ *.o \
