@@ -7,6 +7,8 @@
 #ifndef lparser_h
 #define lparser_h
 
+struct Dyndata;
+
 #include "llimits.h"
 #include "lobject.h"
 #include "lzio.h"
