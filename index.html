@@ -2,109 +2,47 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web YGOPRO 클라이언트</title>
+    <title>Web YGOPRO 실제 플레이 환경</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            background-color: #1a1a1a;
-            color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            overflow: hidden;
-        }
-        #game-container {
-            display: flex;
-            gap: 15px;
-            background: #262626;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-        #game-canvas {
-            background: #1f2421;
-            border: 2px solid #444;
-            border-radius: 6px;
-        }
-        #side-panel {
-            width: 280px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        #card-preview {
-            width: 100%;
-            height: 380px;
-            background: #111;
-            border: 2px solid #555;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-        #card-preview img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-        }
-        #log-console {
-            flex-grow: 1;
-            background: #111;
-            border: 1px solid #333;
-            border-radius: 6px;
-            padding: 10px;
-            font-family: monospace;
-            font-size: 11px;
-            color: #0f0;
-            overflow-y: auto;
-            height: 190px;
-        }
-        .btn-panel {
-            display: flex;
-            gap: 5px;
-            margin-bottom: 10px;
-        }
-        button {
-            background: #444;
-            color: #fff;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover { background: #555; }
+        body { background: #121214; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+        #game-container { display: flex; gap: 20px; background: #1e1e24; padding: 20px; border-radius: 12px; }
+        #game-canvas { background: #151518; border: 2px solid #3a3a44; border-radius: 8px; cursor: pointer; }
+        #side-panel { width: 280px; display: flex; flex-direction: column; gap: 12px; }
+        #card-preview { width: 100%; height: 380px; background: #0b0b0d; border: 2px solid #3a3a44; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+        #card-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        #log-console { flex-grow: 1; background: #0b0b0d; border: 1px solid #2a2a35; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 11px; color: #38ef7d; overflow-y: auto; height: 190px; }
+        
+        /* 카드 우클릭/클릭 시 나타날 플레이 커맨드 메뉴 (소환, 발동 등) */
+        #context-menu { position: absolute; display: none; background: #2a2d34; border: 1px solid #4fadf7; border-radius: 4px; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        #context-menu div { padding: 8px 16px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        #context-menu div:hover { background: #4fadf7; color: #121214; }
     </style>
 </head>
 <body>
 
-    <div class="btn-panel">
-        <button onclick="addDemoCard(0, CardLocation.Hand, 24094653)">내 패에 추가 (블랙 매지션)</button>
-        <button onclick="addDemoCard(0, CardLocation.Hand, 89631139)">내 패에 추가 (백룡)</button>
-        <button onclick="addDemoCard(0, CardLocation.MonsterZone, 46986414)">내 몬스터존 0번 소환</button>
-        <button onclick="addDemoCard(1, CardLocation.MonsterZone, 74677422)">상대 몬스터존 0번 소환</button>
-    </div>
+    <h2 style="margin-bottom: 15px;">WebAssembly OCGCore 실시간 플레이 테스트</h2>
 
     <div id="game-container">
         <canvas id="game-canvas" width="1024" height="600"></canvas>
         <div id="side-panel">
             <div id="card-preview">
-                <span id="preview-placeholder" style="color: #666;">카드에 마우스를 올리세요</span>
-                <img id="preview-image" src="" style="display: none;" alt="Card Preview">
+                <span id="preview-placeholder" style="color: #4a4a5a;">카드를 클릭/우클릭 하세요</span>
+                <img id="preview-image" src="" style="display: none;">
             </div>
-            <div id="log-console">> 시스템 초기화 중...</div>
+            <div id="log-console">> 엔진 및 WASM 런타임 로딩 대기 중...</div>
         </div>
     </div>
 
-    <script src="ocgcore.js" onerror="log('ocgcore.js를 로드할 수 없습니다. 로컬 테스트 모드로 진입합니다.', '#ffaa00')"></script>
-    
+    <div id="context-menu">
+        <div id="menu-summon" onclick="handlePlayAction('summon')">일반 소환 (Summon)</div>
+        <div id="menu-activate" onclick="handlePlayAction('activate')">효과 발동 (Activate)</div>
+    </div>
+
+    <script src="ocgcore.js"></script>
+
     <script>
-        // --- [시스템 로그 유틸] ---
-        function log(message, color = '#0f0') {
+        function log(message, color = '#38ef7d') {
             const consoleDiv = document.getElementById('log-console');
             if (consoleDiv) {
                 consoleDiv.innerHTML += `<br><span style="color: ${color};">> ${message}</span>`;
@@ -112,279 +50,160 @@
             }
         }
 
-        // =========================================================
-        // [1단계 이식 복합체] Enums & GPS & 필드 레이아웃 연산 규칙
-        // =========================================================
-        const CardLocation = { Deck: 0x01, Hand: 0x02, MonsterZone: 0x04, SpellZone: 0x08, Grave: 0x10, Removed: 0x20, Extra: 0x40, Overlay: 0x80 };
-        const CardPosition = { FaceUp: 0x1, FaceDown: 0x2, Attack: 0x4, Defense: 0x8 };
-        
-        class GPS {
-            constructor(controller, location, sequence, position = CardPosition.FaceUp) {
-                this.controller = controller;
-                this.location = location;
-                this.sequence = sequence;
-                this.position = position;
-            }
-        }
+        // 1~3단계 기본 물리 환경 구조체 상속
+        const CardLocation = { Deck: 0x01, Hand: 0x02, MonsterZone: 0x04, SpellZone: 0x08 };
+        class GPS { constructor(controller, location, sequence) { this.controller = controller; this.location = location; this.sequence = sequence; } }
+        const FieldConfig = { canvasWidth: 1024, canvasHeight: 600 };
 
-        const FieldConfig = { fieldSize: 1.0, masterRule: 5, canvasWidth: 1024, canvasHeight: 600 };
-
-        function getPointCanvasPosition(gps) {
-            const centerX = FieldConfig.canvasWidth / 2;
-            const centerY = FieldConfig.canvasHeight / 2;
-            const real = (FieldConfig.fieldSize - 1) * 0.9 + 1.0;
-            const pScale = 24 * real;
-            let returnX = 0, zOffset = 0;
-
-            if ((gps.location & CardLocation.MonsterZone) > 0) {
-                let realIndex = gps.sequence;
-                if (gps.controller === 0) {
-                    zOffset = -4.5 * real;
-                } else {
-                    if (realIndex <= 4) realIndex = 4 - gps.sequence;
-                    else if (realIndex === 5) realIndex = 6;
-                    else if (realIndex === 6) realIndex = 5;
-                    zOffset = 4.5 * real;
-                }
-                switch (realIndex) {
-                    case 0: returnX = -10.5; break;
-                    case 1: returnX = -5.2; break;
-                    case 2: returnX = 0; break;
-                    case 3: returnX = 5.2; break;
-                    case 4: returnX = 10.5; break;
-                    case 5: returnX = -5.2; zOffset = 0; break; 
-                    case 6: returnX = 5.2; zOffset = 0; break; 
-                }
-                return { x: centerX + (returnX * pScale), y: centerY + (zOffset * -1 * pScale * 1.1) };
-            }
-            
-            if ((gps.location & CardLocation.SpellZone) > 0) {
-                let realIndex = gps.sequence;
-                if (gps.controller === 0) zOffset = -8.5 * real;
-                else {
-                    if (realIndex <= 4) realIndex = 4 - gps.sequence;
-                    zOffset = 8.5 * real;
-                }
-                switch (realIndex) {
-                    case 0: returnX = -10.5; break;
-                    case 1: returnX = -5.2; break;
-                    case 2: returnX = 0; break;
-                    case 3: returnX = 5.2; break;
-                    case 4: returnX = 10.5; break;
-                }
-                return { x: centerX + (returnX * pScale), y: centerY + (zOffset * -1 * pScale * 1.1) };
-            }
-
-            return { x: centerX, y: centerY };
-        }
-
-        // =========================================================
-        // [2단계 이식 복합체] WebGameCard 모델 및 정렬 매니저
-        // =========================================================
         class WebGameCard {
             constructor(id, code, gps) {
-                this.id = id;
-                this.code = code;
-                this.gps = gps;
-                this.x = FieldConfig.canvasWidth / 2;
-                this.y = FieldConfig.canvasHeight / 2;
-                this.targetX = this.x;
-                this.targetY = this.y;
-                this.width = 66;
-                this.height = 96;
-                this.moveSpeed = 0.12;
-                this.isHovered = false;
+                this.id = id; this.code = code; this.gps = gps;
+                this.x = FieldConfig.canvasWidth / 2; this.y = FieldConfig.canvasHeight / 2;
+                this.targetX = this.x; this.targetY = this.y;
+                this.width = 64; this.height = 92; this.moveSpeed = 0.12; this.isHovered = false;
             }
-
-            update() {
-                this.x += (this.targetX - this.x) * this.moveSpeed;
-                this.y += (this.targetY - this.y) * this.moveSpeed;
-            }
-
-            draw(context) {
-                context.save();
-                let renderY = this.y;
-                if (this.isHovered && this.gps.location === CardLocation.Hand) {
-                    renderY -= 20; 
-                }
-
-                // 카드 바디 프레임
-                context.fillStyle = this.gps.controller === 0 ? '#2c1d11' : '#1d2c2e';
-                context.fillRect(this.x, renderY, this.width, this.height);
-                
-                // 테두리 강조 연출
-                context.strokeStyle = this.isHovered ? '#ffea00' : '#444';
-                context.lineWidth = this.isHovered ? 3 : 1;
-                context.strokeRect(this.x, renderY, this.width, this.height);
-
-                // 정보 텍스트 기입
-                context.fillStyle = '#fff';
-                context.font = 'bold 9px monospace';
-                context.fillText(this.gps.controller === 0 ? "ME" : "OP", this.x + 5, renderY + 15);
-                context.fillText(this.code, this.x + 5, renderY + 30);
-                context.restore();
+            update() { this.x += (this.targetX - this.x) * this.moveSpeed; this.y += (this.targetY - this.y) * this.moveSpeed; }
+            draw(ctx) {
+                ctx.save();
+                let rY = this.isHovered && this.gps.location === CardLocation.Hand ? this.y - 15 : this.y;
+                ctx.fillStyle = this.gps.controller === 0 ? '#2e1c0c' : '#0c222e';
+                ctx.fillRect(this.x, rY, this.width, this.height);
+                ctx.strokeStyle = this.isHovered ? '#ffee00' : '#444';
+                ctx.strokeRect(this.x, rY, this.width, this.height);
+                ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText(this.code, this.x + 6, rY + 20);
+                ctx.restore();
             }
         }
 
-        function arrangeCards(allCards) {
-            const myHand = allCards.filter(c => c.gps.controller === 0 && c.gps.location === CardLocation.Hand);
-            const opHand = allCards.filter(c => c.gps.controller === 1 && c.gps.location === CardLocation.Hand);
-            const centerX = FieldConfig.canvasWidth / 2;
-            const maxHandWidth = 500;
-            const cardW = 66;
-
-            if (myHand.length > 0) {
-                let interval = cardW + 5;
-                if (myHand.length * interval > maxHandWidth) interval = maxHandWidth / myHand.length;
-                const startX = centerX - ((myHand.length - 1) * interval) / 2 - cardW / 2;
-                myHand.forEach((card, i) => {
-                    card.gps.sequence = i;
-                    card.targetX = startX + (i * interval);
-                    card.targetY = FieldConfig.canvasHeight - 110;
-                });
-            }
-
-            if (opHand.length > 0) {
-                let interval = cardW + 5;
-                if (opHand.length * interval > maxHandWidth) interval = maxHandWidth / opHand.length;
-                const startX = centerX + ((opHand.length - 1) * interval) / 2 - cardW / 2;
-                opHand.forEach((card, i) => {
-                    card.gps.sequence = i;
-                    card.targetX = startX - (i * interval);
-                    card.targetY = 15;
-                });
-            }
-
-            allCards.forEach(card => {
-                if (card.gps.location !== CardLocation.Hand) {
-                    const pos = getPointCanvasPosition(card.gps);
-                    card.targetX = pos.x - card.width / 2;
-                    card.targetY = pos.y - card.height / 2;
-                }
-            });
-        }
-
-        // =========================================================
-        // [3단계 이식 복합체] 충돌 감지 및 ㅂ.txt 프리뷰 처리장치
-        // =========================================================
-        let globalCodeForShow = 0;
-
-        function webAnimationShowCardCodeHandler(code) {
-            if (!code || globalCodeForShow === code) return;
-            globalCodeForShow = code;
-            
-            const previewImg = document.getElementById('preview-image');
-            const placeholder = document.getElementById('preview-placeholder');
-            
-            if (previewImg && placeholder) {
-                previewImg.src = `https://images.ygoprodeck.com/images/cards/${code}.jpg`;
-                placeholder.style.display = 'none';
-                previewImg.style.display = 'block';
-                log(`카드 탐색 프리뷰 동적 결합: ${code}`);
-            }
-        }
-
-        function setupMouseInteraction(canvasElement, allCards) {
-            canvasElement.addEventListener('mousemove', (e) => {
-                const rect = canvasElement.getBoundingClientRect();
-                const mx = e.clientX - rect.left;
-                const my = e.clientY - rect.top;
-                let found = null;
-
-                for (let i = allCards.length - 1; i >= 0; i--) {
-                    const c = allCards[i];
-                    let rY = c.y;
-                    if (c.isHovered && c.gps.location === CardLocation.Hand) rY -= 20;
-                    if (mx >= c.x && mx <= c.x + c.width && my >= rY && my <= rY + c.height) {
-                        found = c;
-                        break;
-                    }
-                }
-
-                allCards.forEach(c => {
-                    if (c === found) {
-                        if (!c.isHovered) {
-                            c.isHovered = true;
-                            webAnimationShowCardCodeHandler(c.code);
-                        }
-                    } else c.isHovered = false;
-                });
-            });
-        }
-
-        // =========================================================
-        // [4단계 이식 복합체] 메인 구동 루프 및 가상 데이터 매핑 환경
-        // =========================================================
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
         const cardList = [];
-        let cardIdCounter = 1;
+        let selectedCard = null; // 현재 메뉴를 열어 선택한 카드 오브젝트 스토리지
+        let pDuelInstance = 0;   // WASM 내부의 듀얼 메모리 포인터 주소 변수
 
-        // 버튼 클릭 유틸: 데모 카드 투입기
-        function addDemoCard(controller, location, code) {
-            const sequenceCounter = cardList.filter(c => c.gps.controller === controller && c.gps.location === location).length;
-            const newCard = new WebGameCard(cardIdCounter++, code, new GPS(controller, location, sequenceCounter));
-            cardList.push(newCard);
-            arrangeCards(cardList);
-            log(`${controller === 0 ? '내' : '상대'} 구역에 카드 일련번호 [${code}] 배치 감지.`);
+        // ===================================================================
+        // 🚀 핵심: WebAssembly(ocgcore.js) 엔진 활성화 및 게임 시작 (기동부)
+        // ===================================================================
+        var Module = {
+            onRuntimeInitialized: function() {
+                log("WASM 핵심 오피셜 룰 엔진(ocgcore.js)결합 성공!", "#00ffff");
+                
+                try {
+                    // C++ 엔진에서 내보낸 함수들을 자바스크립트 함수로 맵핑(래핑)
+                    const create_duel = Module.cwrap('create_duel', 'number', ['number']);
+                    const start_duel = Module.cwrap('start_duel', 'void', ['number', 'number']);
+                    
+                    log("WASM 내부 메모리에 유희왕 가상 룰 판(Instance)을 생성합니다.");
+                    let seed = Math.floor(Math.random() * 12345);
+                    pDuelInstance = create_duel(seed); // 룰 엔진 기동 및 주소값 리턴
+                    log(`[성공] 듀얼 인스턴스가 주소지 ${pDuelInstance}에 배치되었습니다.`);
+
+                    // 게임 플레이 환경 구축을 위한 카드 데이터 세팅
+                    initGamePlayData();
+                    runMainGameLoop();
+                    
+                } catch (err) {
+                    log(`엔진 기동 실패 (컴파일 환경 에러): ${err.message}`, 'red');
+                }
+            }
+        };
+
+        // 초기 시작 덱/패 세팅 함수
+        function initGamePlayData() {
+            // 내 패에 블랙 매지션과 푸른 눈의 백룡 추가
+            cardList.push(new WebGameCard(1, 24094653, new GPS(0, CardLocation.Hand, 0)));
+            cardList.push(new WebGameCard(2, 89631139, new GPS(0, CardLocation.Hand, 1)));
+            arrangeCards();
+            setupInteraction();
         }
 
-        // 필드 고정 라인 레이아웃 가이드선 드로잉 함수
-        function drawFieldSlots() {
-            ctx.strokeStyle = '#3a4454';
-            ctx.lineWidth = 1.5;
-            
-            // 내 구역/상대 구역 가이드라인 (5칸 슬롯 비례 렌더링)
-            for(let i=0; i<5; i++) {
-                let myGpsM = new GPS(0, CardLocation.MonsterZone, i);
-                let myPosM = getPointCanvasPosition(myGpsM);
-                ctx.strokeRect(myPosM.x - 33, myPosM.y - 48, 66, 96);
+        // ===================================================================
+        // 🕹️ 유저 플레이 액션(소환/발동) 처리 및 엔진 데이터 전송
+        // ===================================================================
+        function handlePlayAction(actionType) {
+            const menu = document.getElementById('context-menu');
+            menu.style.display = 'none';
+            if (!selectedCard) return;
 
-                let myGpsS = new GPS(0, CardLocation.SpellZone, i);
-                let myPosS = getPointCanvasPosition(myGpsS);
-                ctx.strokeRect(myPosS.x - 33, myPosS.y - 48, 66, 96);
-
-                let opGpsM = new GPS(1, CardLocation.MonsterZone, i);
-                let opPosM = getPointCanvasPosition(opGpsM);
-                ctx.strokeRect(opPosM.x - 33, opPosM.y - 48, 66, 96);
+            if (actionType === 'summon') {
+                log(`[플레이어 액션] ${selectedCard.code} 카드를 몬스터 존에 일반 소환 시도합니다.`, '#ffea00');
+                
+                // 1. 실제 플레이에서는 이 타이밍에 WASM 엔진에게 유저가 소환했다는 바이트 패킷을 전송합니다.
+                // 예시 바인딩 수식: Module.ccall('process_handler', 'number', ['number', 'number'], [pDuelInstance, selectedCard.code]);
+                
+                // 2. 엔진의 허가 처리가 떨어지면 룰 상태에 맞게 카드의 위치(GPS)를 패에서 몬스터 존으로 변경합니다.
+                selectedCard.gps.location = CardLocation.MonsterZone;
+                selectedCard.gps.sequence = 2; // 메인 몬스터 존 중앙 슬롯 배정
+                
+                // 3. 필드 위치가 변했으므로 카드를 물리적 좌표로 다시 정렬시킵니다.
+                arrangeCards();
             }
         }
 
-        // 메인 렌더 프레임 루프 (유니티 Update() 대체)
-        function runMainGameLoop() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // 1. 배경 매트 가이드라인 드로우
-            drawFieldSlots();
-
-            // 2. 카드 동적 좌표 보간 연산 및 드로우
-            cardList.forEach(card => {
-                card.update();
-                card.draw(ctx);
+        // 인터랙션 (클릭 및 컨텍스트 메뉴 팝업 제어)
+        function setupInteraction() {
+            // 마우스 움직임 호버 감지
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left; const my = e.clientY - rect.top;
+                cardList.forEach(c => {
+                    c.isHovered = (mx >= c.x && mx <= c.x + c.width && my >= c.y && my <= c.y + c.height);
+                    if(c.isHovered) {
+                        document.getElementById('preview-placeholder').style.display = 'none';
+                        const img = document.getElementById('preview-image');
+                        img.src = `https://images.ygoprodeck.com/images/cards/${c.code}.jpg`;
+                        img.style.display = 'block';
+                    }
+                });
             });
 
+            // 우클릭(Context Menu) 시 소환/발동 선택창 UI 구현
+            canvas.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                const hoveredCard = cardList.find(c => c.isHovered && c.gps.controller === 0);
+                if (hoveredCard) {
+                    selectedCard = hoveredCard;
+                    const menu = document.getElementById('context-menu');
+                    menu.style.style = 'block';
+                    menu.style.left = `${e.clientX}px`;
+                    menu.style.top = `${e.clientY}px`;
+                    menu.style.display = 'block';
+                }
+            });
+
+            // 바탕 클릭 시 메뉴 닫기
+            window.addEventListener('click', () => { document.getElementById('context-menu').style.display = 'none'; });
+        }
+
+        // 카드 물리 좌표 정렬 및 드로잉 프레임 엔진
+        function arrangeCards() {
+            cardList.forEach(card => {
+                if (card.gps.location === CardLocation.Hand) {
+                    card.targetX = 300 + (card.gps.sequence * 80);
+                    card.targetY = FieldConfig.canvasHeight - 120;
+                } else if (card.gps.location === CardLocation.MonsterZone) {
+                    card.targetX = FieldConfig.canvasWidth / 2 - card.width / 2;
+                    card.targetY = FieldConfig.canvasHeight / 2 + 20;
+                }
+            });
+        }
+
+        function runMainGameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // 필드 가이드선 그리기
+            ctx.strokeStyle = '#3a3a44'; ctx.strokeRect(150, 150, 724, 150); ctx.strokeRect(150, 310, 724, 150);
+            
+            cardList.forEach(card => { card.update(); card.draw(ctx); });
             requestAnimationFrame(runMainGameLoop);
         }
 
-        // --- 초기 시스템 기동 장치 ---
-        window.onload = () => {
-            setupMouseInteraction(canvas, cardList);
-            
-            // 최초 데모용 스타팅 카드 분배 세팅
-            addDemoCard(0, CardLocation.Hand, 24094653); // 블랙매지션
-            addDemoCard(0, CardLocation.Hand, 89631139); // 푸른눈의 백룡
-            addDemoCard(1, CardLocation.Hand, 46986414); // 상대 카드
-
-            runMainGameLoop();
-            log("유니티 ㅂ.txt 이식 1~4단계 완전체 통합 웹 클라이언트 구동 성공.");
-        };
-
-        // Emscripten 룰 브릿지 연동 인터페이스 정의
-        var Module = {
-            onRuntimeInitialized: function() {
-                log("WASM 오피셜 룰 엔진 core와 결합 완료.", '#00ffff');
+        // 로컬 브라우저 보안 우회용 자동 구동 예외 세팅
+        setTimeout(() => {
+            if (pDuelInstance === 0) {
+                log("서버 환경이 구비되지 않아 가상 시뮬레이션 플레이 모드로 진입합니다.", "#ff9f43");
+                initGamePlayData(); runMainGameLoop();
             }
-        };
+        }, 1200);
     </script>
 </body>
 </html>
