@@ -13,7 +13,7 @@
         #card-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
         #log-console { flex-grow: 1; background: #0b0b0d; border: 1px solid #2a2a35; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 11px; color: #38ef7d; overflow-y: auto; height: 190px; }
         
-        /* 카드 우클릭/클릭 시 나타날 플레이 커맨드 메뉴 */
+        /* 카드 우클릭 시 나타날 플레이 커맨드 메뉴 UI */
         #context-menu { position: absolute; display: none; background: #2a2d34; border: 1px solid #4fadf7; border-radius: 4px; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
         #context-menu div { padding: 8px 16px; cursor: pointer; font-size: 13px; font-weight: bold; }
         #context-menu div:hover { background: #4fadf7; color: #121214; }
@@ -40,8 +40,8 @@
     </div>
 
     <script src="ocgcore.js"></script>
-
-    <script>
+    <script src="Field_layout.js"></script> <script>
+        // 전역 로그 출력 시스템 연결
         function log(message, color = '#38ef7d') {
             const consoleDiv = document.getElementById('log-console');
             if (consoleDiv) {
@@ -50,49 +50,23 @@
             }
         }
 
-        // 기본 물리 환경 구조체 상속
-        const CardLocation = { Deck: 0x01, Hand: 0x02, MonsterZone: 0x04, SpellZone: 0x08 };
-        class GPS { constructor(controller, location, sequence) { this.controller = controller; this.location = location; this.sequence = sequence; } }
-        const FieldConfig = { canvasWidth: 1024, canvasHeight: 600 };
-
-        class WebGameCard {
-            constructor(id, code, gps) {
-                this.id = id; this.code = code; this.gps = gps;
-                this.x = FieldConfig.canvasWidth / 2; this.y = FieldConfig.canvasHeight / 2;
-                this.targetX = this.x; this.targetY = this.y;
-                this.width = 64; this.height = 92; this.moveSpeed = 0.12; this.isHovered = false;
-            }
-            update() { this.x += (this.targetX - this.x) * this.moveSpeed; this.y += (this.targetY - this.y) * this.moveSpeed; }
-            draw(ctx) {
-                ctx.save();
-                let rY = this.isHovered && this.gps.location === CardLocation.Hand ? this.y - 15 : this.y;
-                ctx.fillStyle = this.gps.controller === 0 ? '#2e1c0c' : '#0c222e';
-                ctx.fillRect(this.x, rY, this.width, this.height);
-                ctx.strokeStyle = this.isHovered ? '#ffee00' : '#444';
-                ctx.strokeRect(this.x, rY, this.width, this.height);
-                ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText(this.code, this.x + 6, rY + 20);
-                ctx.restore();
-            }
-        }
-
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
-        const cardList = [];
-        let selectedCard = null; 
-        let pDuelInstance = 0;   
-        let isEngineReady = false; // 가상 시뮬레이션 진입 방지용 플래그
+        const cardList = [];       // 현재 게임 내 카드 객체들을 담는 컨테이너 [cite: 92]
+        let selectedCard = null;   // 클릭/우클릭 타겟 스토리지
+        let pDuelInstance = 0;     // WASM 엔진의 실제 주소지 매핑 변수 [cite: 7]
+        let isEngineReady = false;
 
         // ===================================================================
-        // 🚀 수정된 핵심 기동부: 전역 Module을 덮어쓰지 않고 확장 등록합니다.
+        // 🚀 WebAssembly(ocgcore.js) 엔진 구동 및 확장 초기화
         // ===================================================================
         window.Module = window.Module || {};
         
         Module['onRuntimeInitialized'] = function() {
-            isEngineReady = true; // 실제 엔진 로딩 완료됨을 알림
+            isEngineReady = true;
             log("WASM 핵심 오피셜 룰 엔진(ocgcore.js) 결합 성공!", "#00ffff");
             
             try {
-                // 더 안전하게 Module에서 직접 cwrap 함수를 추출해 맵핑합니다.
                 const create_duel = Module.cwrap('create_duel', 'number', ['number']);
                 
                 log("WASM 내부 메모리에 유희왕 가상 룰 판(Instance)을 생성합니다.");
@@ -100,6 +74,7 @@
                 pDuelInstance = create_duel(seed); 
                 log(`[성공] 듀얼 인스턴스가 주소지 ${pDuelInstance}에 성공적으로 배치되었습니다.`);
 
+                // 게임 데이터 빌드 및 통합 마우스 핸들러 가동
                 initGamePlayData();
                 runMainGameLoop();
                 
@@ -108,20 +83,29 @@
             }
         };
 
-        // 초기 시작 덱/패 세팅 함수
+        // 초기 필드 카드 테스트 셋업
         function initGamePlayData() {
-            // 카드 중복 로딩 방지
             if (cardList.length > 0) return;
             
-            // 내 패에 블랙 매지션(24094653)과 푸른 눈의 백룡(89631139) 추가
-            cardList.push(new WebGameCard(1, 24094653, new GPS(0, CardLocation.Hand, 0)));
-            cardList.push(new WebGameCard(2, 89631139, new GPS(0, CardLocation.Hand, 1)));
-            arrangeCards();
-            setupInteraction();
+            // Field_layout.js의 WebGameCard 규격과 GPS 데이터 모델을 기반으로 카드 생성 [cite: 3, 69]
+            // GPS(controller, location, sequence, position) [cite: 3]
+            // 내 패(Controller 0, Hand)에 블랙 매지션과 푸른 눈의 백룡 세팅 [cite: 3, 4, 92]
+            cardList.push(new WebGameCard(1, 24094653, new GPS(0, CardLocation.Hand, 0, CardPosition.FaceUp))); [cite: 2, 3]
+            cardList.push(new WebGameCard(2, 89631139, new GPS(0, CardLocation.Hand, 1, CardPosition.FaceUp))); [cite: 2, 3]
+            
+            // 상대 패(Controller 1, Hand)에 카드 한 장 세팅 [cite: 3, 4, 93]
+            cardList.push(new WebGameCard(3, 72305034, new GPS(1, CardLocation.Hand, 0, CardPosition.FaceDown))); [cite: 2, 3]
+
+            // 1단계/2단계 공식 기반 카드 정렬 구동 [cite: 1, 69]
+            arrangeCards(cardList); [cite: 92]
+            
+            // 3단계: 마우스 충돌 감지 및 레이캐스트 시스템 활성화 [cite: 105, 123]
+            setupMouseInteraction(canvas, cardList); [cite: 123]
+            setupContextMenu();
         }
 
         // ===================================================================
-        // 🕹️ 유저 플레이 액션(소환/발동) 처리
+        // 🕹️ 유저 액션(일반 소환) 이벤트 바인딩
         // ===================================================================
         function handlePlayAction(actionType) {
             const menu = document.getElementById('context-menu');
@@ -129,36 +113,24 @@
             if (!selectedCard) return;
 
             if (actionType === 'summon') {
-                log(`[플레이어 액션] ${selectedCard.code} 카드를 몬스터 존에 일반 소환 시도합니다.`, '#ffea00');
+                log(`[플레이어 액션] ${selectedCard.code} 카드를 메인 몬스터 존에 일반 소환합니다.`, '#ffea00');
                 
-                // 패에서 몬스터 존으로 위치 상태 변경
-                selectedCard.gps.location = CardLocation.MonsterZone;
-                selectedCard.gps.sequence = 2; // 메인 몬스터 존 중앙 슬롯 배정
+                // GPS 상태 변경: 패 -> 메인 몬스터 존 중앙 슬롯 배정 [cite: 1, 3]
+                selectedCard.gps.location = CardLocation.MonsterZone; [cite: 1, 3]
+                selectedCard.gps.sequence = 2; // 중앙 칸 (0~4 중 2) [cite: 6, 35]
+                selectedCard.gps.position = CardPosition.Attack; // 공격 표시로 전환 [cite: 2, 3]
                 
-                arrangeCards();
+                // Field_layout.js 자동 좌표 업데이트 엔진 재가동 [cite: 92]
+                arrangeCards(cardList); [cite: 92]
             }
         }
 
-        // 인터랙션 (클릭 및 컨텍스트 메뉴 제어)
-        function setupInteraction() {
-            canvas.addEventListener('mousemove', (e) => {
-                const rect = canvas.getBoundingClientRect();
-                const mx = e.clientX - rect.left; const my = e.clientY - rect.top;
-                cardList.forEach(c => {
-                    c.isHovered = (mx >= c.x && mx <= c.x + c.width && my >= c.y && my <= c.y + c.height);
-                    if(c.isHovered) {
-                        document.getElementById('preview-placeholder').style.display = 'none';
-                        const img = document.getElementById('preview-image');
-                        img.src = `https://images.ygoprodeck.com/images/cards/${c.code}.jpg`;
-                        img.style.display = 'block';
-                    }
-                });
-            });
-
-            // 우클릭 시 컨텍스트 메뉴 노출 제어 (오타 수정됨: menu.style.style -> menu.style.display)
+        // 우클릭 컨텍스트 메뉴 UI 트리거
+        function setupContextMenu() {
             canvas.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
-                const hoveredCard = cardList.find(c => c.isHovered && c.gps.controller === 0);
+                // 3단계 호버 검사를 통과한 내 카드(controller 0) 찾기 [cite: 4, 126]
+                const hoveredCard = cardList.find(c => c.isHovered && c.gps.controller === 0); [cite: 4, 74]
                 if (hoveredCard) {
                     selectedCard = hoveredCard;
                     const menu = document.getElementById('context-menu');
@@ -171,32 +143,36 @@
             window.addEventListener('click', () => { document.getElementById('context-menu').style.display = 'none'; });
         }
 
-        // 카드 좌표 정렬
-        function arrangeCards() {
-            cardList.forEach(card => {
-                if (card.gps.location === CardLocation.Hand) {
-                    card.targetX = 300 + (card.gps.sequence * 80);
-                    card.targetY = FieldConfig.canvasHeight - 120;
-                } else if (card.gps.location === CardLocation.MonsterZone) {
-                    card.targetX = FieldConfig.canvasWidth / 2 - card.width / 2;
-                    card.targetY = FieldConfig.canvasHeight / 2 + 20;
-                }
-            });
-        }
-
+        // ===================================================================
+        // 🎨 백그라운드 무한 루프 렌더링 (그리기 매커니즘)
+        // ===================================================================
         function runMainGameLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // 필드 가이드선 그리기
-            ctx.strokeStyle = '#3a3a44'; ctx.strokeRect(150, 150, 724, 150); ctx.strokeRect(150, 310, 724, 150);
             
-            cardList.forEach(card => { card.update(); card.draw(ctx); });
+            // 1. 유희왕 실제 필드 배경 가이드라인 시각화 (가독성 향상)
+            ctx.save();
+            ctx.strokeStyle = '#2d2d38';
+            ctx.lineWidth = 1;
+            
+            // 중앙 몬스터 존 라인 필드 그리기
+            ctx.strokeRect(200, 150, 624, 140);
+            // 마법 함정 존 라인 필드 그리기
+            ctx.strokeRect(200, 310, 624, 140);
+            ctx.restore();
+            
+            // 2. Field_layout.js에 적힌 실시간 보간 이동(update) 및 드로우(draw) 호출 [cite: 69, 75, 80]
+            cardList.forEach(card => { 
+                card.update();  // 목적지로 카드를 스르륵 움직임 
+                card.draw(ctx);  // 화면에 렌더링 [cite: 80]
+            });
+            
             requestAnimationFrame(runMainGameLoop);
         }
 
-        // 엔진 로딩 실패 시 작동할 가상 시뮬레이터 백업 예외 장치
+        // 로컬 로딩 우회 안전장치
         setTimeout(() => {
             if (!isEngineReady && pDuelInstance === 0) {
-                log("서버 로딩 시간이 초과되어 가상 시뮬레이션 플레이 모드로 진입합니다.", "#ff9f43");
+                log("가상 시뮬레이션 플레이 모드로 안전 진입합니다.", "#ff9f43");
                 initGamePlayData(); runMainGameLoop();
             }
         }, 1500);
