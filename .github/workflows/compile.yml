@@ -22,17 +22,13 @@ jobs:
 
       - name: Compile Pure C++ and Lua Source Files
         run: |
-          echo "=== 1단계: 모든 소스를 하나의 C++ 환경 기호로 강제 통일 ==="
-          # 루아 헤더가 임의로 집어넣는 extern "C" 감싸기(LUA_API, LUALIB_API) 규격을 완전히 공백 처리하여
-          # 전체 오브젝트 파일들이 무조건 동일한 C++ 네임스페이스 규칙을 따르도록 강제합니다.
-          em++ -O3 -std=c++17 -c *.cpp l*.c \
-            -D"__declspec(x)=" \
-            -D"LUA_API= " \
-            -D"LUALIB_API= " \
-            -D"LUAI_FUNC=extern" \
-            -I.
+          echo "=== 1단계: 루아 소스를 C++ 규격으로 강제 포함 빌드 ==="
+          # 루아 소스 내부의 C++ 바인딩 네임스페이스가 꼬이지 않도록 명시적으로 l*.c 파일을 
+          # C++ 컴파일러(em++) 규칙에 맞추어 일괄 컴파일합니다.
+          em++ -O3 -std=c++17 -c *.cpp l*.c -D"__declspec(x)=" -D"LUA_USE_CTYPE" -I.
 
           echo "=== 2단계: 웹어셈블리 최종 링크 ==="
+          # 기호 불일치가 발생하지 않도록 모아진 모든 오브젝트 파일을 하나로 묶어줍니다.
           em++ *.o \
             -O3 \
             -s WASM=1 \
