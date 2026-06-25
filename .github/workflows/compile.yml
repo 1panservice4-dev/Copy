@@ -22,16 +22,15 @@ jobs:
         with:
           version: 'latest'
 
-      # [정산 핵심] 쉘 충돌을 방지하기 위해 단일 따옴표 안에 매크로 정의를 격리하고,
-      # 스크린샷 101번에서 확인되었던 'byte' 타입 오류 가능성까지 'unsigned char'로 강제 바인딩합니다.
+      # [정산 핵심] 표준 라이브러리를 건드리는 -Dbyte를 즉시 제거하고,
+      # 윈도우용 __declspec만 표준 매크로 방식으로 완벽히 무력화합니다.
       - name: Compile Pure C++ Source Files
         run: |
           echo "=== 순수 C++ 파일 컴파일 진행 중 ==="
           emcc *.cpp \
             -O3 \
             -std=c++17 \
-            '-D__declspec(x)=' \
-            '-Dbyte=unsigned char' \
+            -D"__declspec(x)=" \
             -I. \
             -s WASM=1 \
             -s EXPORTED_FUNCTIONS="['_create_duel', '_start_duel', '_process', '_new_card', '_set_player_info']" \
