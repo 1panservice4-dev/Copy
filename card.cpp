@@ -3192,7 +3192,7 @@ int32 card::is_destructable_by_effect(effect* peffect, uint8 playerid) {
 			pduel->lua->add_param(REASON_EFFECT, PARAM_TYPE_INT);
 			pduel->lua->add_param(playerid, PARAM_TYPE_INT);
 			int32 ct;
-			if(ct = eset[i]->get_value(3)) {
+			if(ct == eset[i]->get_value(3)) {
 				auto it = indestructable_effects.insert(std::make_pair(eset[i]->id, 0));
 				if(it.first->second + 1 <= ct) {
 					return FALSE;
