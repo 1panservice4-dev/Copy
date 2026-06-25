@@ -22,15 +22,18 @@ jobs:
         with:
           version: 'latest'
 
-      # [정산 핵심] -x c++ 플래그를 명령어 맨 앞에 두어, 
-      # 뒤따라오는 *.cpp와 *.c 파일 모두를 C++17 규격으로 안전하게 일괄 컴파일하도록 강제합니다.
+      # [정산 핵심] 루아 내부 상호 참조 구조체들이 분리 빌드 시 깨지는 것을 막기 위해
+      # -D 플래그를 통해 Closure, Labeldesc, Vardesc의 존재를 컴파일러에게 주입합니다.
       - name: Compile Pure C++ and Lua Source Files
         run: |
-          echo "=== C++ 및 루아 파일 통합 빌드 (규격 분리 정산) ==="
+          echo "=== C++ 및 루아 파일 통합 빌드 (의존성 일괄 정산) ==="
           emcc -x c++ *.cpp *.c \
             -O3 \
             -std=c++17 \
             -D"__declspec(x)=" \
+            -D"Closure=union Closure" \
+            -D"Labeldesc=struct Labeldesc" \
+            -D"Vardesc=struct Vardesc" \
             -I. \
             -s WASM=1 \
             -s EXPORTED_FUNCTIONS="['_create_duel', '_start_duel', '_process', '_new_card', '_set_player_info']" \
