@@ -18,47 +18,9 @@ jobs:
       with:
         version: 3.1.64
 
-    - name: 3. 윈도우 호환 옵션(-fdeclspec) 추가하여 전체 컴파일
+    - name: 3. 전체 파일 자동 수집 및 컴파일 (윈도우 문법 지원 옵션 추가)
       run: |
-        # -fdeclspec 옵션을 추가하여 __declspec(dllexport) 문법 에러를 해결합니다.
-        
-        emcc -O3 -s WASM=1 -fdeclspec \
-          -s EXPORTED_FUNCTIONS="['_create_duel', '_start_duel', '_end_duel', '_set_card_reader', '_set_script_reader', '_set_message_handler', '_process_command', '_get_log_message']" \
-          -s EXTRA_EXPORTED_RUNTIME_METHODS="['cwrap', 'ccall']" \
-          -s ALLOW_MEMORY_GROWTH=1 \
-          -o ocgcore.js \
-          *.cpp *.c
-
-    - name: 4. 컴파일 완료된 자바스크립트 및 WASM 추출
-      uses: actions/upload-artifact@v4
-      with:
-        name: ygopro-web-engine
-        path: |
-          ocgcore.js
-          ocgcore.wasmname: Build YGOPro OCGCore WebAssembly Final Fix
-
-on:
-  push:
-    branches: [ "main", "master" ]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: 1. 저장소 소스코드 체크아웃
-      uses: actions/checkout@v4
-
-    - name: 2. Emscripten(emsdk) 컴파일러 환경 세팅
-      uses: mymindstorm/setup-emsdk@v14
-      with:
-        version: 3.1.64
-
-    - name: 3. 윈도우 호환 옵션(-fdeclspec) 추가하여 전체 컴파일
-      run: |
-        # -fdeclspec 옵션을 추가하여 __declspec(dllexport) 문법 에러를 해결합니다.
-        
+        # 현재 폴더 내부의 모든 .cpp 파일과 .c 파일을 자동으로 수집하여 빌드합니다.
         emcc -O3 -s WASM=1 -fdeclspec \
           -s EXPORTED_FUNCTIONS="['_create_duel', '_start_duel', '_end_duel', '_set_card_reader', '_set_script_reader', '_set_message_handler', '_process_command', '_get_log_message']" \
           -s EXTRA_EXPORTED_RUNTIME_METHODS="['cwrap', 'ccall']" \
