@@ -426,29 +426,61 @@ function checkMouseCollision(mx, my, card) {
  * 카드가 호버되었을 때 우측 프리뷰 UI 패널에 고화질 일러스트와 정보를 렌더링합니다.
  * @param {number} code - 카드 고유 번호 (예: 24094653)
  */
-function webAnimationShowCardCodeHandler(code) {
+// ===================================================================
+// 🗃️ 외부 유희왕 카드 데이터베이스 API 연동 및 비동기 캐싱 핸들러
+// ===================================================================
+let globalCodeForShow = 0;
+const cardDataCache = {}; // 한 번 불러온 카드 데이터를 저장해두는 임시 저장소 (네트워크 절약)
+
+async function webAnimationShowCardCodeHandler(code) {
     if (!code || globalCodeForShow === code) return;
-    
-    // 최신 보여줄 코드 상태 갱신
     globalCodeForShow = code;
     
+    // UI 엘리먼트 가져오기
     const previewImg = document.getElementById('preview-image');
     const placeholder = document.getElementById('preview-placeholder');
     
+    // --- 1. 이미지 우선 연결 (YGOPRO 공식 고화질 이미지 경로) ---
     if (previewImg && placeholder) {
-        // 유니티 GameTextureManager.get 텍스처 로직을 웹 표준 오픈 API 패스로 전환 이식
-        // 정식 서비스 시 로컬 카드 DB 경로 등으로 수정 가능합니다.
-        const targetTextureUrl = `https://images.ygoprodeck.com/images/cards/${code}.jpg`;
-        
-        // 텍스처 교체 및 돔(DOM) 렌더링 반영
+        previewImg.src = `https://images.ygoprodeck.com/images/cards/${code}.jpg`;
         placeholder.style.display = 'none';
-        previewImg.src = targetTextureUrl;
         previewImg.style.display = 'block';
+    }
+
+    // --- 2. yugioh-card-data-api를 통한 한글 텍스트 및 상세 DB 연결 ---
+    try {
+        let cardInfo;
         
-        // 웹 콘솔 로그 장치에 바인딩
-        if (typeof log === 'function') {
-            log(`Card 프리뷰 갱신 트리거 완료 (Code: ${code})`);
+        // 캐시에 이미 데이터가 있다면 API 호출 없이 바로 사용
+        if (cardDataCache[code]) {
+            cardInfo = cardDataCache[code];
+        } else {
+            // 보내주신 github API의 싱글 카드 조회 엔드포인트 호출
+            const response = await fetch(`https://yugioh-card-data-api.vercel.app/api/card/${code}`);
+            if (!response.ok) throw new Error('DB 조회 실패');
+            
+            cardInfo = await response.json();
+            cardDataCache[code] = cardInfo; // 캐시에 저장
         }
+
+        // --- 3. 가져온 DB 데이터를 로그 콘솔 및 프리뷰 UI에 출력 (YGOPRO 방식) ---
+        if (cardInfo) {
+            // 카드의 종류(몬스터, 마법, 함정)에 따른 스탯 문자열 포맷팅
+            let statsText = "";
+            if (cardInfo.type.includes("Monster")) {
+                statsText = ` [ATK: ${cardInfo.atk} / DEF: ${cardInfo.def}]`;
+            }
+            
+            log(`[DB 연동] 카드 정보 로드 완료: ★${cardInfo.name}★${statsText}`, '#00ffff');
+            
+            // (선택 사항) 우측 패널 아래에 카드 텍스트 UI가 있다면 아래처럼 주입할 수 있습니다.
+            // document.getElementById('card-name').innerText = cardInfo.name;
+            // document.getElementById('card-description').innerText = cardInfo.desc;
+        }
+
+    } catch (error) {
+        // 해당 API에 아직 등록되지 않은 임의의 가상 코드일 경우 예외 처리
+        log(`[DB 공백] 코드 ${code}의 한글 정보가 API 데이터베이스에 없습니다. (기본 이미지 렌더링 유지)`, '#ff9f43');
     }
 }
 
