@@ -241,3 +241,156 @@ function getPointCanvasPosition(gps, overFatherCount = 0) {
 
     return { x: centerX, y: centerY };
 }
+/**
+ * 2단계: 카드 객체 상태 관리 및 부드러운 이동(Lerp) 애니메이션 모듈
+ */
+
+// 유니티의 gameCard 구조를 웹에 맞게 확장한 클래스
+class WebGameCard {
+    constructor(id, code, gps) {
+        this.id = id;
+        this.code = code;
+        this.gps = gps; // 1단계에서 정의한 GPS 객체
+
+        // 현재 물리 좌표 (화면에 실제로 그려지는 위치)
+        this.x = 0;
+        this.y = 0;
+
+        // 목적지 물리 좌표 (이동해야 할 목표 위치)
+        this.targetX = 0;
+        this.targetY = 0;
+
+        // 카드 크기 규격
+        this.width = 68;
+        this.height = 100;
+        
+        // 애니메이션 속도 제어 변수 (유니티의 MoveSpeed 정산)
+        this.moveSpeed = 0.15; // 값이 작을수록 부드럽고 묵직하게 이동
+        
+        // 상태 플래그
+        this.isHovered = false;
+        this.isMoving = false;
+    }
+
+    /**
+     * ㅂ.txt의 GCS_cardMove 역할 대체
+     * 매 프레임 목적지를 향해 카드를 조금씩 이동시키는 연산 (선형 보간)
+     */
+    update() {
+        // X축 보간 연산
+        if (Math.abs(this.targetX - this.x) > 0.1) {
+            this.x += (this.targetX - this.x) * this.moveSpeed;
+            this.isMoving = true;
+        } else {
+            this.x = this.targetX;
+        }
+
+        // Y축 보간 연산
+        if (Math.abs(this.targetY - this.y) > 0.1) {
+            this.y += (this.targetY - this.y) * this.moveSpeed;
+            this.isMoving = true;
+        } else {
+            this.y = this.targetY;
+            if (Math.abs(this.targetX - this.x) <= 0.1) {
+                this.isMoving = false; // 이동 완료
+            }
+        }
+    }
+
+    /**
+     * 캔버스에 카드를 렌더링하는 함수 (앞면/뒷면 분기 처리 포함)
+     */
+    draw(context) {
+        context.save();
+
+        // 마우스 호버 시 약간 위로 들리거나 강조되는 연출 (유니티 툴 대체 효과)
+        let renderY = this.y;
+        if (this.isHovered && this.gps.location === CardLocation.Hand) {
+            renderY -= 15; // 패에 있을 때 호버하면 카드가 위로 쏙 올라옴
+        }
+
+        // 카드 테두리 및 프레임 그리기
+        context.fillStyle = '#2c1d11'; // 기본 프레임 색상
+        context.fillRect(this.x, renderY, this.width, this.height);
+
+        // 앞면/뒷면 표시 형식(CardPosition)에 따른 처리
+        if ((this.gps.position & CardPosition.FaceDown) > 0) {
+            // 뒷면일 때 (유니티 뒷면 텍스처 대체)
+            context.fillStyle = '#7a1f1d';
+            context.fillRect(this.x + 4, renderY + 4, this.width - 8, this.height - 8);
+            context.strokeStyle = '#ffaa00';
+            context.strokeRect(this.x + 8, renderY + 8, this.width - 16, this.height - 16);
+        } else {
+            // 앞면일 때 (카드 일러스트 구역 및 텍스트)
+            context.strokeStyle = this.isHovered ? '#ffea00' : '#ffffff';
+            context.lineWidth = this.isHovered ? 2 : 1;
+            context.strokeRect(this.x, renderY, this.width, this.height);
+
+            // 카드 코드 그리기
+            context.fillStyle = '#ffffff';
+            context.font = '10px Arial';
+            context.fillText(this.code, this.x + 5, renderY + 15);
+        }
+
+        context.restore();
+    }
+}
+
+/**
+ * ㅂ.txt 중반부의 패(Hand) 구성 시 장수에 따라 간격을 좁히거나 넓히는 자동 정렬 알고리즘 이식
+ * @param {Array<WebGameCard>} allCards - 현재 판에 존재하는 모든 카드 리스트
+ */
+function arrangeCards(allCards) {
+    // 1. 내 패(Controller 0, Hand)와 상대 패(Controller 1, Hand)를 분리 필터링
+    const myHand = allCards.filter(c => c.gps.controller === 0 && c.gps.location === CardLocation.Hand);
+    const opHand = allCards.filter(c => c.gps.controller === 1 && c.gps.location === CardLocation.Hand);
+
+    const centerX = FieldConfig.canvasWidth / 2;
+    const maxHandWidth = 500; // 패가 펼쳐질 최대 가로 폭 기본 정산
+    const baseCardWidth = 70;
+
+    // 내 패 자동 정렬 좌표 계산 함수
+    if (myHand.length > 0) {
+        // 장수가 많아지면 카드가 겹치도록 간격(Interval)을 유동적으로 축소
+        let interval = baseCardWidth + 5;
+        if (myHand.length * interval > maxHandWidth) {
+            interval = maxHandWidth / myHand.length;
+        }
+
+        const startX = centerX - ((myHand.length - 1) * interval) / 2 - baseCardWidth / 2;
+        
+        myHand.forEach((card, index) => {
+            card.gps.sequence = index; // 시퀀스 최신화
+            card.targetX = startX + (index * interval);
+            card.targetY = FieldConfig.canvasHeight - 120; // 화면 하단 배치
+        });
+    }
+
+    // 상대 패 자동 정렬 좌표 계산 함수 (시점 반전 처리 적용)
+    if (opHand.length > 0) {
+        let interval = baseCardWidth + 5;
+        if (opHand.length * interval > maxHandWidth) {
+            interval = maxHandWidth / opHand.length;
+        }
+
+        const startX = centerX + ((opHand.length - 1) * interval) / 2 - baseCardWidth / 2;
+
+        opHand.forEach((card, index) => {
+            card.gps.sequence = index;
+            card.targetX = startX - (index * interval); // 상대방은 반대 방향 정렬
+            card.targetY = 20; // 화면 상단 배치
+        });
+    }
+
+    // 2. 패가 아닌 필드(몬스터존, 마함존, 덱 등)에 있는 카드들은 1단계 좌표 연산 장치로 타겟 할당
+    allCards.forEach(card => {
+        if (card.gps.location !== CardLocation.Hand) {
+            // 1단계의 getPointCanvasPosition 규칙으로 최종 목적지 픽셀 좌표 획득
+            const pos = getPointCanvasPosition(card.gps);
+            
+            // 카드 중심점을 맞추기 위해 카드 크기의 절반만큼 오프셋 정산 후 타겟 지정
+            card.targetX = pos.x - card.width / 2;
+            card.targetY = pos.y - card.height / 2;
+        }
+    });
+}
