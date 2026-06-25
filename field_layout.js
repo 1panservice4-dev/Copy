@@ -394,3 +394,105 @@ function arrangeCards(allCards) {
         }
     });
 }
+/**
+ * 3단계: 마우스 포인터 충돌 감지(Raycast 대체) 및 카드 프리뷰 핸들러 모듈
+ */
+
+// 유니티의 code_for_show 전역 변수 이식
+let globalCodeForShow = 0;
+
+/**
+ * 캔버스 안에서 마우스 좌표와 카드 객체의 사각형 영역이 겹치는지 검사하는 함수
+ * @param {number} mx - 마우스 X 좌표 (캔버스 내부 상대 좌표)
+ * @param {number} my - 마우스 Y 좌표 (캔버스 내부 상대 좌표)
+ * @param {WebGameCard} card - 검사할 카드 객체
+ */
+function checkMouseCollision(mx, my, card) {
+    // 2단계에서 구현한 패(Hand)에 따른 y축 들림 연출 보정값 적용
+    let renderY = card.y;
+    if (card.isHovered && card.gps.location === CardLocation.Hand) {
+        renderY -= 15;
+    }
+
+    // 마우스 포인터가 카드의 가로/세로 범위 내에 완전히 들어왔는지 판별
+    return (mx >= card.x && 
+            mx <= card.x + card.width && 
+            my >= renderY && 
+            my <= renderY + card.height);
+}
+
+/**
+ * ㅂ.txt의 animation_show_card_code_handler() 및 pro1CardShower 역할 완벽 대체
+ * 카드가 호버되었을 때 우측 프리뷰 UI 패널에 고화질 일러스트와 정보를 렌더링합니다.
+ * @param {number} code - 카드 고유 번호 (예: 24094653)
+ */
+function webAnimationShowCardCodeHandler(code) {
+    if (!code || globalCodeForShow === code) return;
+    
+    // 최신 보여줄 코드 상태 갱신
+    globalCodeForShow = code;
+    
+    const previewImg = document.getElementById('preview-image');
+    const placeholder = document.getElementById('preview-placeholder');
+    
+    if (previewImg && placeholder) {
+        // 유니티 GameTextureManager.get 텍스처 로직을 웹 표준 오픈 API 패스로 전환 이식
+        // 정식 서비스 시 로컬 카드 DB 경로 등으로 수정 가능합니다.
+        const targetTextureUrl = `https://images.ygoprodeck.com/images/cards/${code}.jpg`;
+        
+        // 텍스처 교체 및 돔(DOM) 렌더링 반영
+        placeholder.style.display = 'none';
+        previewImg.src = targetTextureUrl;
+        previewImg.style.display = 'block';
+        
+        // 웹 콘솔 로그 장치에 바인딩
+        if (typeof log === 'function') {
+            log(`Card 프리뷰 갱신 트리거 완료 (Code: ${code})`);
+        }
+    }
+}
+
+/**
+ * 유니티 마우스 입력 시스템을 HTML5 Canvas 이벤트 리스너 규칙으로 바인딩
+ * @param {HTMLCanvasElement} canvasElement - 렌더링 중인 게임 캔버스 엘리먼트
+ * @param {Array<WebGameCard>} allCards - 필드에 존재하는 카드 목록
+ */
+function setupMouseInteraction(canvasElement, allCards) {
+    canvasElement.addEventListener('mousemove', (event) => {
+        // 브라우저 전체 화면 좌표를 캔버스 내부 절대 픽셀 좌표로 변환 정산
+        const rect = canvasElement.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        let foundHoverCard = null;
+
+        // 역순 탐색 (레이어 상 맨 위에 그려진 카드부터 우선 충돌 판정하기 위함)
+        for (let i = allCards.length - 1; i >= 0; i--) {
+            const card = allCards[i];
+            if (checkMouseCollision(mouseX, mouseY, card)) {
+                foundHoverCard = card;
+                break; // 가장 위에 있는 카드 한 장만 낚아챔
+            }
+        }
+
+        // 상태 변동에 따른 최신화 및 핸들러 호출
+        allCards.forEach(card => {
+            if (card === foundHoverCard) {
+                if (!card.isHovered) {
+                    card.isHovered = true;
+                    // ㅂ.txt 소스의 핵심 핸들러 연동 호출
+                    webAnimationShowCardCodeHandler(card.code);
+                }
+            } else {
+                card.isHovered = false;
+            }
+        });
+    });
+
+    // 마우스가 캔버스를 완전히 벗어났을 때 호버 상태 일괄 해제 루틴
+    canvasElement.addEventListener('mouseleave', () => {
+        allCards.forEach(card => {
+            card.isHovered = false;
+        });
+    });
+}
