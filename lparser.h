@@ -11,6 +11,24 @@
 #include "lobject.h"
 #include "lzio.h"
 
+/* C++ 통합 빌드 시 lstate.h 의존성으로 인한 incomplete type 에러를 방지하기 위해 
+   Dyndata 구조체의 완전한 정의를 상단에 직접 배치합니다. */
+typedef struct Labellist {
+  struct Labeldesc *arr;
+  int n;
+  int size;
+} Labellist;
+
+typedef struct Dyndata {
+  struct {
+    struct Vardesc *arr;
+    int n;
+    int size;
+  } actvar;
+  Labellist gt;
+  Labellist label;
+} Dyndata;
+
 /*
 ** Expression and variable descriptor
 */
@@ -76,7 +94,7 @@ typedef struct FuncState {
 
 
 LUAI_FUNC LClosure *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff,
-                                 struct Dyndata *dyd, const char *name, int firstchar);
+                                 Dyndata *dyd, const char *name, int firstchar);
 
 
 #endif
