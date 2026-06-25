@@ -12,7 +12,7 @@
 #define ldo_c
 #define LUA_CORE
 
-#include "lprefix.h"
+//#include "lprefix.h"
 
 #include <setjmp.h>
 #include <stdlib.h>
