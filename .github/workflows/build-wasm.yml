@@ -1,4 +1,4 @@
-name: Build YGOPro OCGCore WebAssembly Fixed
+name: Build YGOPro OCGCore WebAssembly Force Auto
 
 on:
   push:
@@ -18,21 +18,17 @@ jobs:
       with:
         version: 3.1.64
 
-    - name: 3. 사진 속 모든 소스 파일 목록 기반 컴파일 (중복 제거 완료)
+    - name: 3. 와일드카드로 실존하는 모든 소스 강제 컴파일
       run: |
+        # 폴더 내에 실제로 존재하는 모든 .cpp 파일과 .c 파일을 와일드카드(*)로 한 번에 컴파일러에 던집니다.
+        # 이 방식은 존재하지 않는 파일명을 적지 않으므로 'No such file' 에러가 절대 나지 않습니다.
+        
         emcc -O3 -s WASM=1 \
           -s EXPORTED_FUNCTIONS="['_create_duel', '_start_duel', '_end_duel', '_set_card_reader', '_set_script_reader', '_set_message_handler', '_process_command', '_get_log_message']" \
           -s EXTRA_EXPORTED_RUNTIME_METHODS="['cwrap', 'ccall']" \
           -s ALLOW_MEMORY_GROWTH=1 \
           -o ocgcore.js \
-          ocgapi.cpp duel.cpp card.cpp field.cpp processor.cpp effect.cpp group.cpp \
-          interpreter.cpp libcard.cpp libduel.cpp libeffect.cpp libgroup.cpp \
-          mem.cpp scriptlib.cpp \
-          lapi.c lauxlib.c ido.c \
-          lbaselib.c lbitlib.c lcode.c lcorolib.c lctype.c ldblib.c ldebug.c \
-          ldump.c lfunc.c lgc.c linit.c liolib.c llex.c lmathlib.c lmem.c \
-          loadlib.c lobject.c lopcodes.c loslib.c lparser.c lstate.c \
-          lstring.c lstrlib.c ltable.c ltm.c lundump.c lvm.c lzio.c
+          *.cpp *.c 2>/dev/null || emcc -O3 -s WASM=1 -s EXPORTED_FUNCTIONS="['_create_duel', '_start_duel', '_end_duel', '_set_card_reader', '_set_script_reader', '_set_message_handler', '_process_command', '_get_log_message']" -s EXTRA_EXPORTED_RUNTIME_METHODS="['cwrap', 'ccall']" -s ALLOW_MEMORY_GROWTH=1 -o ocgcore.js *.cpp *.c
 
     - name: 4. 컴파일 완료된 자바스크립트 및 WASM 추출
       uses: actions/upload-artifact@v4
