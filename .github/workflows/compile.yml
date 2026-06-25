@@ -1,48 +1,19 @@
-name: Pure Cpp to WebAssembly and Self-Commit
-
-on:
-  push:
-    branches: [ main, master ]
-
-permissions:
-  contents: write
-
-jobs:
-  build-and-commit:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Setup Emscripten compiler
-        uses: mymindstorm/setup-emsdk@v11
-        with:
-          version: 'latest'
-
-      - name: Compile Pure C++ and Lua Source Files
+- name: Compile Pure C++ and Lua Source Files
         run: |
-          echo "=== 1단계: 루아 C 소스 파일 컴파일 (C 규격 독립 빌드) ==="
+          echo "=== 1단계: 루아 C 소스 파일 컴파일 ==="
           emcc -O3 -c *.c -I.
 
-          echo "=== 2단계: OCGCore C++ 소스 파일 컴파일 ==="
-          em++ -O3 -std=c++17 -c *.cpp -D"__declspec(x)=" -I.
+          echo "=== 2단계: OCGCore C++ 소스 파일 컴파일 (YML 매크로 주입) ==="
+          # 전역적으로 C++ 파일들이 루아 함수들을 맹글링하지 않도록 강제 매크로 처리하거나, 
+          # 링크 시점에 가짜 맹글링 이름을 연결할 수 있게 컴파일 옵션을 지정합니다.
+          em++ -O3 -std=c++17 -c *.cpp -D"__declspec(x)=" -D"luaL_openlibs=extern \"C\" luaL_openlibs" -I. 2>/dev/null || em++ -O3 -std=c++17 -c *.cpp -D"__declspec(x)=" -I.
 
-          echo "=== 3단계: 웹어셈블리 최종 링크 (이름 맹글링 해결) ==="
+          echo "=== 3단계: 링크 단계에서 강제 기호 매핑 ==="
+          # 링커에게 이름이 꼬인 luaL_openlibs 기호를 C 스타일 기호로 강제 별칭(alias) 지정합니다.
           em++ *.o \
             -O3 \
             -s WASM=1 \
+            -Wl,--defsym,_Z14luaL_openlibsP9lua_State=luaL_openlibs \
             -s EXPORTED_FUNCTIONS="['_create_duel', '_start_duel', '_process', '_new_card', '_set_player_info']" \
             -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" \
             -o ocgcore.js
-
-      - name: Commit and Push Compiled Files Direct
-        run: |
-          git config --local user.email "1panservice4-dev@users.noreply.github.com"
-          git config --local user.name "GitHub Action Robot"
-          git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-          git add ocgcore.js ocgcore.wasm
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: 엔진 빌드 성공 및 웹 배포용 파일 자동 갱신"
-            git push origin HEAD:${{ github.ref_name }}
-          fi
