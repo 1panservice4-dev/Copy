@@ -58,4 +58,3 @@ byte* default_script_reader(const char* script_name, int* len);
 uint32 default_card_reader(uint32 code, card_data* data);
 uint32 default_message_handler(void* pduel, uint32 msg_type);
 
-#endif /* OCGAPI_H_ */
