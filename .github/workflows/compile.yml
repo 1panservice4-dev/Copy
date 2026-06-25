@@ -23,7 +23,7 @@ jobs:
       - name: Compile Pure C++ and Lua Source Files
         run: |
           echo "=== 1단계: 루아 C 소스 파일 컴파일 ==="
-          emcc -O3 -c *.c -I.
+          emcc -O3 -c l*.c -I.
 
           echo "=== 2단계: OCGCore C++ 소스 파일 컴파일 ==="
           em++ -O3 -std=c++17 -c *.cpp -D"__declspec(x)=" -I.
