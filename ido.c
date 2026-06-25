@@ -12,6 +12,12 @@
 #define ldo_c
 #define LUA_CORE
 
+#include "lprefix.h"
+
+#include <setjmp.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "lua.h"
 
 #include "lapi.h"
@@ -22,18 +28,15 @@
 #include "lmem.h"
 #include "lobject.h"
 #include "lopcodes.h"
-// ... 기존 다른 include들 ...
-#include "lzio.h"
-
-#include "lstate.h"  // <--- 이 줄을 lparser.h 보다 무조건 '위쪽'에 추가해 주세요!
-#include "lparser.h"
-
-// ... 아래 코드 생략 
+#include "lstate.h"     /* Dyndata 구조체의 실제 정의가 들어있는 곳 */
 #include "lstring.h"
 #include "ltable.h"
 #include "ltm.h"
 #include "lundump.h"
 #include "lvm.h"
+#include "lzio.h"
+
+#include "lparser.h"    /* lstate.h가 완벽히 로드된 다음에 읽어야incomplete type 에러가 안 납니다 */
 
 
 
