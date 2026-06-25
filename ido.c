@@ -22,14 +22,18 @@
 #include "lmem.h"
 #include "lobject.h"
 #include "lopcodes.h"
+// ... 기존 다른 include들 ...
+#include "lzio.h"
+
+#include "lstate.h"  // <--- 이 줄을 lparser.h 보다 무조건 '위쪽'에 추가해 주세요!
 #include "lparser.h"
-#include "lstate.h"
+
+// ... 아래 코드 생략 
 #include "lstring.h"
 #include "ltable.h"
 #include "ltm.h"
 #include "lundump.h"
 #include "lvm.h"
-#include "lzio.h"
 
 
 
