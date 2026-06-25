@@ -27,8 +27,8 @@ jobs:
           -o ocgcore.js \
           ocgapi.cpp duel.cpp card.cpp field.cpp processor.cpp effect.cpp group.cpp \
           interpreter.cpp libcard.cpp libduel.cpp libeffect.cpp libgroup.cpp \
-          mem.cpp scriptlib.cpp string.cpp validator.cpp \
-          Lapi.c Lauxlib.c Ido.c \
+          mem.cpp scriptlib.cpp validator.cpp \
+          lapi.c lauxlib.c ido.c \
           lbaselib.c lbitlib.c lcode.c lcorolib.c lctype.c ldblib.c ldebug.c \
           ldump.c lfunc.c lgc.c linit.c liolib.c llex.c lmathlib.c lmem.c \
           loadlib.c lobject.c lopcodes.c loslib.c lparser.c lstate.c \
